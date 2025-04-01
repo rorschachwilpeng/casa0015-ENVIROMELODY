@@ -26,11 +26,11 @@
 		</data>
 		<key>Modules/FirebaseCoreInternal.swiftmodule/Project/arm64-apple-ios-simulator.swiftsourceinfo</key>
 		<data>
-		JQxQdK6f6r3piHVjSR3GJBFmHkI=
+		mO5dlvKyFSIwKnzgaTB4nxz0wJs=
 		</data>
 		<key>Modules/FirebaseCoreInternal.swiftmodule/Project/x86_64-apple-ios-simulator.swiftsourceinfo</key>
 		<data>
-		m2pqRwLKpTYnLB6GT5WJxCMrH84=
+		g6r80VJRvtTkdfCK+RWtByy0kM8=
 		</data>
 		<key>Modules/FirebaseCoreInternal.swiftmodule/arm64-apple-ios-simulator.abi.json</key>
 		<data>
@@ -42,7 +42,7 @@
 		</data>
 		<key>Modules/FirebaseCoreInternal.swiftmodule/arm64-apple-ios-simulator.swiftmodule</key>
 		<data>
-		VD3dDIpN9qhq3zKmTyf5yExA6kM=
+		GeBOdQX3QksoXc5Sjofz7l5E2dA=
 		</data>
 		<key>Modules/FirebaseCoreInternal.swiftmodule/x86_64-apple-ios-simulator.abi.json</key>
 		<data>
@@ -54,7 +54,7 @@
 		</data>
 		<key>Modules/FirebaseCoreInternal.swiftmodule/x86_64-apple-ios-simulator.swiftmodule</key>
 		<data>
-		pd6tLeMSfjJS5HbAEws7LwF2tgM=
+		4gTlwtn0GKqJFmmRUjl/lgGUSLI=
 		</data>
 		<key>Modules/module.modulemap</key>
 		<data>
@@ -95,14 +95,14 @@
 		<dict>
 			<key>hash2</key>
 			<data>
-			p8ExYLyl1exPEVkJ2b7/ZRr6QBAx7+Mnr0JSeMHBbF8=
+			6xtT4hKcXanBhv0pYtqLGmTv7SvFij4v9TVzm2y47GE=
 			</data>
 		</dict>
 		<key>Modules/FirebaseCoreInternal.swiftmodule/Project/x86_64-apple-ios-simulator.swiftsourceinfo</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			HjdbhUouD+QvpSSSnUM6fFlrjkQiyau+ZhQV2RtdnwQ=
+			GX/AreroJuB7caiE7ZhG/GWUYeUnXSZnv5Cp+xQ9k5M=
 			</data>
 		</dict>
 		<key>Modules/FirebaseCoreInternal.swiftmodule/arm64-apple-ios-simulator.abi.json</key>
@@ -123,7 +123,7 @@
 		<dict>
 			<key>hash2</key>
 			<data>
-			DnbjYBObEuAH7HYvpaCvd7hom4N/BRJwyB3O1Ypk8g4=
+			iYOVFSnHgVZdVVZMceUCT1jRTNog9ikHUwEm0CmT4z8=
 			</data>
 		</dict>
 		<key>Modules/FirebaseCoreInternal.swiftmodule/x86_64-apple-ios-simulator.abi.json</key>
@@ -144,7 +144,7 @@
 		<dict>
 			<key>hash2</key>
 			<data>
-			SrWEj9hL2eSQY4PqRcknJGbxLzmHJGjHaq7x2ytZIQE=
+			iEFErKY/dO7ODk0srg1HI1fpdCv+4yCuVhp9Vh/scNU=
 			</data>
 		</dict>
 		<key>Modules/module.modulemap</key>
