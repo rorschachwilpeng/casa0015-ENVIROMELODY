@@ -5,8 +5,8 @@ import '../services/suno_api_service.dart';
 import '../models/suno_music.dart';
 import 'dart:developer' as developer;
 import '../utils/config.dart';
-import 'dart:async'; // 支持Timer和Stopwatch
-import 'dart:io'; // 添加SocketException支持
+import 'dart:async'; // Timer and Stopwatch
+import 'dart:io'; // Add SocketException support
 import 'package:flutter/services.dart'; // Add Clipboard support
 
 class CreateScreen extends StatefulWidget {
@@ -29,19 +29,19 @@ class _CreateScreenState extends State<CreateScreen> {
   String? _generatedMusicId;
   String _statusMessage = "";
   
-  // 添加API积分信息状态
+  // Add API credit information status
   int? _remainingCredits;
   int? _dailyLimit;
   bool _isLoadingCredits = false;
   
-  // 添加音频播放状态跟踪
+  // Add audio playback status tracking
   bool _isPlaying = false;
   
-  // 添加用于取消轮询的变量
+  // Add variable for cancelling polling
   bool _isCancelled = false;
   Timer? _pollingTimer;
   
-  // API服务地址
+  // API service address
   String _currentApiUrl = AppConfig.sunoApiBaseUrl;
   bool _usingBackupUrl = false;
 
@@ -51,14 +51,14 @@ class _CreateScreenState extends State<CreateScreen> {
     _apiService = SunoApiService(baseUrl: _currentApiUrl);
     _testApiConnection();
     
-    // 添加音频播放状态监听
+    // Add Audio playing status listening
     _audioPlayer.playerStateStream.listen((state) {
       setState(() {
         _isPlaying = state.playing;
       });
     });
     
-    // 初始化后检查API额度
+    // Init API credits
     _checkApiQuota();
   }
 
@@ -66,12 +66,12 @@ class _CreateScreenState extends State<CreateScreen> {
   void dispose() {
     _promptController.dispose();
     _audioPlayer.dispose();
-    _cancelPolling(); // 确保在页面销毁时取消任何进行中的轮询
-    _apiService.dispose(); // 关闭HTTP客户端
+    _cancelPolling(); // Make sure to cancel any ongoing polling when the page is destroyed
+    _apiService.dispose(); // Close HTTP Client
     super.dispose();
   }
 
-  // 切换API服务地址
+  // Switch API service address
   void _switchApiUrl() {
     // Store old service to dispose it properly
     final oldApiService = _apiService;
@@ -268,7 +268,7 @@ class _CreateScreenState extends State<CreateScreen> {
         });
         await _pollMusicStatus(_generatedMusicId!);
       } else {
-        throw Exception('无法从响应中获取音乐ID');
+        throw Exception('Cant get music ID from response');
       }
     } on TimeoutException catch (e) {
       // Check if cancelled
@@ -305,11 +305,11 @@ class _CreateScreenState extends State<CreateScreen> {
       
       developer.log('Error generating music: $e', error: e);
       
-      // 检查是否是500错误
+      // Check if it's a 500 error
       if (e.toString().contains('500')) {
         developer.log('Detected 500 server error, checking API quota status');
-        // 检查API额度状态，帮助诊断问题
-        try {
+        // Check API quota status, help diagnose problems
+        try { 
           final quotaInfo = await _apiService.getApiLimits();
           
           int? remainingCredits;
@@ -320,7 +320,7 @@ class _CreateScreenState extends State<CreateScreen> {
           }
           
           if (remainingCredits != null && remainingCredits < 5) {
-            // 积分不足，显示特定的错误信息
+            // Insufficient credits, show specific error message
             setState(() {
               _isLoading = false;
               _errorMessage = 'Music generation failed: Insufficient credits (remaining: $remainingCredits). Each generation requires at least 5-10 credits.';
@@ -328,7 +328,7 @@ class _CreateScreenState extends State<CreateScreen> {
             });
             return;
           } else {
-            // 积分充足，可能是服务器临时问题
+            // Sufficient credits,
             setState(() {
               _isLoading = false;
               _errorMessage = 'Server error (500): The Suno API server encountered an internal error. This could be due to server load or temporary issues. Try again later.';
@@ -336,7 +336,7 @@ class _CreateScreenState extends State<CreateScreen> {
             });
           }
         } catch (quotaError) {
-          // 无法获取额度信息，回退到通用错误
+          // Unable to get quota information, fallback to general error
           setState(() {
             _isLoading = false;
             _errorMessage = 'Server error (500): Could not determine cause. Check your network connection and Suno account status.';
@@ -400,7 +400,7 @@ class _CreateScreenState extends State<CreateScreen> {
     );
   }
 
-  // 轮询检查音乐生成状态
+  // Poll music generation status
   Future<void> _pollMusicStatus(String id) async {
     bool isCompleted = false;
     int attempts = 0;
@@ -666,7 +666,7 @@ class _CreateScreenState extends State<CreateScreen> {
     });
   }
 
-  // 播放音频
+  // Play audio
   Future<void> _playAudio(String url) async {
     try {
       developer.log('Setting audio URL: $url');
@@ -681,7 +681,7 @@ class _CreateScreenState extends State<CreateScreen> {
     }
   }
 
-  // 检查API额度信息
+  // Check API quota information
   Future<void> _checkApiQuota() async {
     try {
       setState(() {
@@ -692,11 +692,11 @@ class _CreateScreenState extends State<CreateScreen> {
       final quotaInfo = await _apiService.getApiLimits();
       developer.log('API quota information received: $quotaInfo');
       
-      // 尝试从返回数据中提取关键信息
+      // Try to extract key information from the returned data
       int? remainingCredits;
       int? dailyLimit;
       
-      // 处理不同可能的响应格式
+      // Handle different possible response formats
       if (quotaInfo.containsKey('remaining_credits')) {
         remainingCredits = quotaInfo['remaining_credits'];
       } else if (quotaInfo.containsKey('credits') && quotaInfo['credits'] is Map) {
@@ -704,19 +704,19 @@ class _CreateScreenState extends State<CreateScreen> {
         dailyLimit = quotaInfo['credits']['limit'];
       }
       
-      // 更新状态
+      // Update status
       setState(() {
         _remainingCredits = remainingCredits;
         _dailyLimit = dailyLimit;
         _isLoadingCredits = false;
         
-        // 如果积分不足，显示警告
-        if (remainingCredits != null && remainingCredits < 10) {
+        // If credits are low, show warning
+        if (remainingCredits != null && remainingCredits < 50) {
           _errorMessage = 'Warning: Low API credits remaining ($remainingCredits). Music generation may fail.';
         }
       });
       
-      // 记录找到的信息
+      // Record found information
       if (remainingCredits != null) {
         developer.log('Remaining API credits: $remainingCredits');
         if (dailyLimit != null) {
@@ -730,7 +730,7 @@ class _CreateScreenState extends State<CreateScreen> {
       setState(() {
         _isLoadingCredits = false;
       });
-      // 不在UI上显示这个错误，因为这只是诊断信息
+      // Don't show this error on UI, it's just diagnostic information
     }
   }
 
@@ -740,7 +740,7 @@ class _CreateScreenState extends State<CreateScreen> {
       appBar: AppBar(
         title: const Text('Generate Music'),
         actions: [
-          // 添加菜单按钮
+          // Add menu button
           PopupMenuButton<String>(
             onSelected: (value) {
               if (value == 'switch_api') {
@@ -756,13 +756,13 @@ class _CreateScreenState extends State<CreateScreen> {
           ),
         ],
       ),
-      body: SingleChildScrollView( // 添加滚动支持
+      body: SingleChildScrollView( // Add scroll support
         child: Padding(
           padding: const EdgeInsets.all(16.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // API连接状态
+              // API connection status
               Container(
                 padding: const EdgeInsets.all(8.0),
                 decoration: BoxDecoration(
@@ -794,7 +794,7 @@ class _CreateScreenState extends State<CreateScreen> {
                               color: Colors.grey[700],
                             ),
                           ),
-                          // 显示API积分信息
+                          // Show API quota information
                           if (_remainingCredits != null) ...[
                             const SizedBox(height: 4),
                             Row(
@@ -827,7 +827,7 @@ class _CreateScreenState extends State<CreateScreen> {
                     ),
                     Row(
                       children: [
-                        // 添加检查积分按钮
+                        // Add check credits button
                         if (_isApiConnected) 
                           IconButton(
                             icon: const Icon(Icons.monetization_on, size: 20),
@@ -847,7 +847,7 @@ class _CreateScreenState extends State<CreateScreen> {
               
               const SizedBox(height: 16.0),
               
-              // 提示词输入
+              // Prompt input
               TextField(
                 controller: _promptController,
                 decoration: const InputDecoration(
@@ -861,13 +861,13 @@ class _CreateScreenState extends State<CreateScreen> {
               
               const SizedBox(height: 16.0),
               
-              // 生成/取消按钮
+              // Generate/Cancel button
               SizedBox(
                 width: double.infinity,
                 child: _isLoading
                     ? Row(
                         children: [
-                          // 取消按钮
+                          // Cancel button
                           Expanded(
                             child: ElevatedButton.icon(
                               onPressed: _cancelGeneration,
@@ -890,7 +890,7 @@ class _CreateScreenState extends State<CreateScreen> {
                       ),
               ),
               
-              // 状态消息和进度指示器
+              // Status message and progress indicator
               if (_isLoading) ...[
                 const SizedBox(height: 16.0),
                 Row(
@@ -914,7 +914,7 @@ class _CreateScreenState extends State<CreateScreen> {
                 ),
               ],
               
-              // 错误消息
+              // Error message
               if (_errorMessage != null) ...[
                 const SizedBox(height: 16.0),
                 Container(
@@ -941,7 +941,7 @@ class _CreateScreenState extends State<CreateScreen> {
               
               const SizedBox(height: 24.0),
               
-              // 生成结果
+              // Generated result
               if (_generatedMusic != null) ...[
                 Text(
                   'Generated Music:',
@@ -955,7 +955,7 @@ class _CreateScreenState extends State<CreateScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // 优化标题显示，处理可能的乱码和文本溢出
+                        // Optimize title display, handle possible text overflow
                         Text(
                           _safeText(_generatedMusic!.title, 'Untitled Music'),
                           style: Theme.of(context).textTheme.titleMedium,
@@ -963,7 +963,7 @@ class _CreateScreenState extends State<CreateScreen> {
                           maxLines: 2,
                         ),
                         const SizedBox(height: 8.0),
-                        // 优化提示词显示
+                        // Optimize prompt display
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -1027,7 +1027,7 @@ class _CreateScreenState extends State<CreateScreen> {
                             ),
                           ],
                         ),
-                        // 添加歌曲播放状态指示器
+                        // Add song playback status indicator
                         if (_isPlaying) ...[
                           const SizedBox(height: 16.0),
                           const Row(
@@ -1058,25 +1058,25 @@ class _CreateScreenState extends State<CreateScreen> {
     );
   }
   
-  // 添加安全文本处理方法，处理可能的乱码和null值
+  // Add safe text processing method, handle possible text overflow and null values
   String _safeText(String? text, String defaultValue) {
     if (text == null || text.isEmpty) {
       return defaultValue;
     }
     
     try {
-      // 过滤掉不可打印字符和控制字符
+      // Filter out non-printable characters and control characters
       final filteredText = text
           .replaceAll(RegExp(r'[\p{Cc}\p{Cf}\p{Co}\p{Cn}]', unicode: true), '')
           .trim();
           
-      // 如果过滤后文本长度明显变短或为空，可能是乱码
+      // If the filtered text length is significantly shorter or empty, it might be corrupted
       if (filteredText.isEmpty || filteredText.length < text.length / 2) {
         developer.log('Detected potentially corrupted text: $text');
         return defaultValue;
       }
       
-      // 检查文本是否含有过多特殊字符
+      // Check if the text contains too many special characters
       if (filteredText.runes.where((rune) => 
         (rune < 32 || (rune > 126 && rune < 160)) && 
         rune != 10 && rune != 13).length > filteredText.length / 3) {
@@ -1093,17 +1093,17 @@ class _CreateScreenState extends State<CreateScreen> {
 
   String? getMusicId(dynamic response) {
     if (response is List && response.isNotEmpty) {
-      // 如果是列表，取第一个元素
+      // If it's a list, take the first element
       final firstItem = response[0];
       if (firstItem is Map && firstItem.containsKey('id')) {
         return firstItem['id'].toString();
       }
     } else if (response is Map && response.containsKey('id')) {
-      // 如果直接是Map对象
+      // If it's a Map object directly
       return response['id'].toString();
     }
     
-    // 找不到ID
+    // Cant find ID
     return null;
   }
 } 

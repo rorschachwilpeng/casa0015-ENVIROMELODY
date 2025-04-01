@@ -92,7 +92,7 @@ class SunoMusic {
     );
   }
   
-  // 安全地解析日期时间
+  // Parse date time safely
   static DateTime _parseDateTime(dynamic dateValue) {
     if (dateValue == null) {
       return DateTime.now();
@@ -100,18 +100,18 @@ class SunoMusic {
     
     try {
       if (dateValue is String) {
-        // 尝试解析各种日期格式
+        // Try to parse various date formats
         if (dateValue.contains('T') || dateValue.contains('-')) {
           return DateTime.parse(dateValue);
         } else if (dateValue.length == 10 && int.tryParse(dateValue) != null) {
-          // Unix时间戳（秒）
+          // Unix timestamp (seconds)
           return DateTime.fromMillisecondsSinceEpoch(int.parse(dateValue) * 1000);
         }
       } else if (dateValue is int) {
-        // 处理Unix时间戳（毫秒或秒）
+        // Handle Unix timestamp (milliseconds or seconds)
         return dateValue > 9999999999
-            ? DateTime.fromMillisecondsSinceEpoch(dateValue) // 毫秒
-            : DateTime.fromMillisecondsSinceEpoch(dateValue * 1000); // 秒
+            ? DateTime.fromMillisecondsSinceEpoch(dateValue) // milliseconds
+            : DateTime.fromMillisecondsSinceEpoch(dateValue * 1000); // seconds
       }
     } catch (e) {
       print('Error parsing date: $e');
@@ -120,10 +120,10 @@ class SunoMusic {
     return DateTime.now();
   }
   
-  // 检查音乐对象是否有效
+  // Check if the music object is valid
   bool get isValid => id.isNotEmpty && (audioUrl.isNotEmpty || status != 'complete');
   
-  // 获取友好展示的日期
+  // Get friendly date display
   String get formattedDate {
     return '${createdAt.year}-${createdAt.month.toString().padLeft(2, '0')}-${createdAt.day.toString().padLeft(2, '0')} ${createdAt.hour.toString().padLeft(2, '0')}:${createdAt.minute.toString().padLeft(2, '0')}';
   }

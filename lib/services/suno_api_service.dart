@@ -15,77 +15,77 @@ class SunoApiService {
   
   SunoApiService({String? baseUrl}) 
       : baseUrl = baseUrl ?? AppConfig.sunoApiBaseUrl {
-    _logger.i('SunoAPI: 初始化，基础URL: ${this.baseUrl}');
+    _logger.i('SunoAPI: Initialized, base URL: ${this.baseUrl}');
   }
   
-  // 测试API连接 - 对baseUrl直接测试
+  // Test API connection - direct test of baseUrl
   Future<bool> testConnection() async {
-    _logger.i('测试API连接: $baseUrl');
+    _logger.i('Testing API connection: $baseUrl');
     
     try {
-      // 尝试API提供的健康检查端点
+      // Try the health check endpoint provided by API
       final url = baseUrl.endsWith('/api') 
-          ? '$baseUrl/get_limit'  // 如果baseUrl已包含/api
-          : '$baseUrl/api/get_limit';  // 如果baseUrl不包含/api
+          ? '$baseUrl/get_limit'  // If baseUrl already contains /api
+          : '$baseUrl/api/get_limit';  // If baseUrl doesn't contain /api
           
-      _logger.i('测试URL: $url');
+      _logger.i('Test URL: $url');
       
       final response = await _client.get(
         Uri.parse(url),
         headers: {'Content-Type': 'application/json'},
       ).timeout(const Duration(seconds: 5));
       
-      _logger.i('API测试响应: ${response.statusCode}');
+      _logger.i('API test response: ${response.statusCode}');
       
-      // 只有200状态码才返回true
+      // Only return true for 200 status code
       return response.statusCode == 200;
     } catch (e) {
-      _logger.e('API连接测试失败: $e');
+      _logger.e('API connection test failed: $e');
       return false;
     }
   }
   
-  // 获取API配额信息
+  // Get API quota information
   Future<dynamic> getApiLimits() async {
-    _logger.i('获取API配额信息');
+    _logger.i('Getting API quota information');
     
     try {
-      // 直接使用baseUrl，添加get_limit但不重复/api
+      // Use baseUrl directly, add get_limit without duplicating /api
       final url = baseUrl.endsWith('/api') 
-          ? '$baseUrl/get_limit'  // 如果baseUrl已经包含/api
-          : '$baseUrl/api/get_limit';  // 如果baseUrl不包含/api
+          ? '$baseUrl/get_limit'  // If baseUrl already contains /api
+          : '$baseUrl/api/get_limit';  // If baseUrl doesn't contain /api
           
-      _logger.i('获取配额URL: $url');
+      _logger.i('Get quota URL: $url');
       
       final response = await _client.get(
         Uri.parse(url),
         headers: {'Content-Type': 'application/json'},
       ).timeout(Duration(seconds: AppConfig.apiRequestTimeoutSeconds));
       
-      _logger.i('配额响应: ${response.statusCode}');
+      _logger.i('Quota response: ${response.statusCode}');
       
       if (response.statusCode == 200) {
         return json.decode(response.body);
       } else {
-        throw Exception('获取配额失败: ${response.statusCode}');
+        throw Exception('Failed to get quota: ${response.statusCode}');
       }
     } catch (e) {
-      _logger.e('获取配额失败: $e');
+      _logger.e('Failed to get quota: $e');
       throw e;
     }
   }
   
-  // 生成音乐
+  // Generate music
   Future<dynamic> generateMusic(String prompt) async {
-    _logger.i('生成音乐请求: $prompt');
+    _logger.i('Generate music request: $prompt');
     
     try {
-      // 构建正确的URL，避免重复/api
+      // Build the correct URL, avoid duplicating /api
       final url = baseUrl.endsWith('/api') 
-          ? '$baseUrl/generate'  // 如果baseUrl已经包含/api
-          : '$baseUrl/api/generate';  // 如果baseUrl不包含/api
+          ? '$baseUrl/generate'  // If baseUrl already contains /api
+          : '$baseUrl/api/generate';  // If baseUrl doesn't contain /api
           
-      _logger.i('生成音乐URL: $url');
+      _logger.i('Generate music URL: $url');
       
       final requestBody = {'prompt': prompt};
       
@@ -95,45 +95,45 @@ class SunoApiService {
         body: json.encode(requestBody),
       ).timeout(Duration(seconds: AppConfig.generateMusicTimeoutSeconds));
       
-      _logger.i('生成响应: ${response.statusCode}');
+      _logger.i('Generation response: ${response.statusCode}');
       
       if (response.statusCode == 200 || response.statusCode == 201) {
         return json.decode(response.body);
       } else {
-        throw Exception('生成音乐失败: ${response.statusCode}');
+        throw Exception('Failed to generate music: ${response.statusCode}');
       }
     } catch (e) {
-      _logger.e('生成音乐失败: $e');
+      _logger.e('Failed to generate music: $e');
       throw e;
     }
   }
   
-  // 获取音乐信息
+  // Get music information
   Future<dynamic> getMusicInfo(String id) async {
-    _logger.i('获取音乐信息: ID=$id');
+    _logger.i('Getting music information: ID=$id');
     
     try {
-      // 构建正确的URL，避免重复/api
+      // Build the correct URL, avoid duplicating /api
       final url = baseUrl.endsWith('/api') 
-          ? '$baseUrl/get?ids=$id'  // 如果baseUrl已经包含/api
-          : '$baseUrl/api/get?ids=$id';  // 如果baseUrl不包含/api
+          ? '$baseUrl/get?ids=$id'  // If baseUrl already contains /api
+          : '$baseUrl/api/get?ids=$id';  // If baseUrl doesn't contain /api
           
-      _logger.i('获取音乐信息URL: $url');
+      _logger.i('Get music info URL: $url');
       
       final response = await _client.get(
         Uri.parse(url),
         headers: {'Content-Type': 'application/json'},
       ).timeout(Duration(seconds: AppConfig.apiRequestTimeoutSeconds));
       
-      _logger.i('获取信息响应: ${response.statusCode}');
+      _logger.i('Get info response: ${response.statusCode}');
       
       if (response.statusCode == 200) {
         return json.decode(response.body);
       } else {
-        throw Exception('获取音乐信息失败: ${response.statusCode}');
+        throw Exception('Failed to get music info: ${response.statusCode}');
       }
     } catch (e) {
-      _logger.e('获取音乐信息失败: $e');
+      _logger.e('Failed to get music info: $e');
       throw e;
     }
   }
