@@ -69,6 +69,9 @@ dependencies:
   intl: ^0.18.1
   uuid: ^3.0.7
   logger: ^1.4.0
+  
+  # 添加以下依赖：
+  path_provider: ^2.0.15  # 用于获取文件存储路径
 
 dev_dependencies:
   flutter_test:

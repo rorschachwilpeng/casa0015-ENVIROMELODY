@@ -8,6 +8,10 @@ import '../utils/config.dart';
 import 'dart:async'; // Timer and Stopwatch
 import 'dart:io'; // Add SocketException support
 import 'package:flutter/services.dart'; // Add Clipboard support
+import '../services/stability_audio_service.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 
 class CreateScreen extends StatefulWidget {
   const CreateScreen({Key? key}) : super(key: key);
@@ -44,12 +48,56 @@ class _CreateScreenState extends State<CreateScreen> {
   // API service address
   String _currentApiUrl = AppConfig.sunoApiBaseUrl;
   bool _usingBackupUrl = false;
+  
+  // Add new variables
+  StabilityAudioService? _stabilityService;
+  final int _generationSteps = 30; // 固定为30步，不可调整
+  int _durationSeconds = AppConfig.defaultAudioDurationSeconds;
 
   @override
   void initState() {
     super.initState();
-    _apiService = SunoApiService(baseUrl: _currentApiUrl);
-    _testApiConnection();
+    
+    // 初始化API服务（缺少这行代码可能导致其他错误）
+    // 即使我们现在只使用Stability AI，其他方法可能仍然依赖这个服务
+    _apiService = SunoApiService(baseUrl: AppConfig.sunoApiBaseUrl);
+    
+    // 输出诊断信息
+    final diagnostics = AppConfig.getDiagnosticInfo();
+    developer.log('Stability AI 配置诊断信息:');
+    developer.log('API密钥状态: ${diagnostics["stabilityApiKeyStatus"]}');
+    developer.log('API URL: ${diagnostics["stabilityApiUrl"]}');
+    
+    try {
+      developer.log('开始初始化StabilityAudioService...');
+      if (AppConfig.isStabilityApiKeyValid()) {
+        developer.log('API密钥格式验证通过');
+        
+        // 尝试创建服务实例
+        try {
+          final apiKey = AppConfig.stabilityApiKey;
+          developer.log('创建服务实例，使用API密钥: ${apiKey.substring(0, 5)}...');
+          
+          _stabilityService = StabilityAudioService(apiKey: apiKey);
+          developer.log('StabilityAudioService实例创建成功');
+        } catch (serviceError) {
+          developer.log('创建服务实例失败: $serviceError', error: serviceError);
+          setState(() {
+            _errorMessage = "创建Stability AI服务实例失败: $serviceError";
+          });
+        }
+      } else {
+        developer.log('API密钥验证失败: ${AppConfig.getStabilityApiKeyStatus()}');
+        setState(() {
+          _errorMessage = "Stability API密钥无效: ${AppConfig.getStabilityApiKeyStatus()}";
+        });
+      }
+    } catch (e) {
+      developer.log('整体初始化过程出错: $e', error: e);
+      setState(() {
+        _errorMessage = "无法初始化Stability AI服务: $e";
+      });
+    }
     
     // Add Audio playing status listening
     _audioPlayer.playerStateStream.listen((state) {
@@ -57,122 +105,15 @@ class _CreateScreenState extends State<CreateScreen> {
         _isPlaying = state.playing;
       });
     });
-    
-    // Init API credits
-    _checkApiQuota();
   }
 
   @override
   void dispose() {
     _promptController.dispose();
     _audioPlayer.dispose();
-    _cancelPolling(); // Make sure to cancel any ongoing polling when the page is destroyed
-    _apiService.dispose(); // Close HTTP Client
+    _cancelPolling();
+    _stabilityService?.dispose();
     super.dispose();
-  }
-
-  // Switch API service address
-  void _switchApiUrl() {
-    // Store old service to dispose it properly
-    final oldApiService = _apiService;
-    
-    setState(() {
-      _usingBackupUrl = !_usingBackupUrl;
-      _currentApiUrl = _usingBackupUrl 
-          ? AppConfig.sunoApiBaseUrlBackup 
-          : AppConfig.sunoApiBaseUrl;
-      
-      // Create new API service with updated URL
-      _apiService = SunoApiService(baseUrl: _currentApiUrl);
-      _statusMessage = "Switched to ${_usingBackupUrl ? 'backup' : 'primary'} API server";
-    });
-    
-    // Dispose the old service after creating the new one
-    oldApiService.dispose();
-    developer.log('Old API service disposed, new service created with URL: $_currentApiUrl');
-    
-    // Test the new connection
-    _testApiConnection();
-  }
-
-  // Test API connection
-  Future<void> _testApiConnection() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-      _statusMessage = "Testing API connection...";
-    });
-
-    try {
-      developer.log('Starting API connection test...');
-      final isConnected = await _apiService.testConnection();
-      developer.log('API connection test result: $isConnected');
-      
-      setState(() {
-        _isApiConnected = isConnected;
-        _isLoading = false;
-        _statusMessage = isConnected ? "API connection successful" : "API connection failed";
-      });
-      
-      // If connection failed and not using backup URL, try using backup URL
-      if (!isConnected && !_usingBackupUrl) {
-        _showTryBackupDialog();
-      }
-    } on TimeoutException catch (e) {
-      developer.log('API connection test timeout: $e', error: e);
-      setState(() {
-        _isApiConnected = false;
-        _isLoading = false;
-        _errorMessage = 'Connection timeout: Please ensure the Suno API service is running';
-        _statusMessage = "";
-      });
-      _showTryBackupDialog();
-    } on SocketException catch (e) {
-      developer.log('API connection test network error: $e', error: e);
-      setState(() {
-        _isApiConnected = false;
-        _isLoading = false;
-        _errorMessage = 'Network error: Unable to connect to API service';
-        _statusMessage = "";
-      });
-      _showTryBackupDialog();
-    } catch (e) {
-      developer.log('API connection test error: $e', error: e);
-      setState(() {
-        _isApiConnected = false;
-        _isLoading = false;
-        _errorMessage = 'Unable to connect to API: $e';
-        _statusMessage = "";
-      });
-    }
-  }
-  
-  // Show dialog to try backup URL
-  void _showTryBackupDialog() {
-    if (!mounted) return;
-    
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('API Connection Failed'),
-        content: const Text('Unable to connect to main API service. Do you want to try using the backup address?'),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-            },
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-              _switchApiUrl();
-            },
-            child: const Text('Try Backup Address'),
-          ),
-        ],
-      ),
-    );
   }
 
   // Cancel polling and generation process
@@ -670,7 +611,14 @@ class _CreateScreenState extends State<CreateScreen> {
   Future<void> _playAudio(String url) async {
     try {
       developer.log('Setting audio URL: $url');
-      await _audioPlayer.setUrl(url);
+      
+      // Check if it's a local file
+      if (url.startsWith('/')) {
+        await _audioPlayer.setFilePath(url);
+      } else {
+        await _audioPlayer.setUrl(url);
+      }
+      
       developer.log('Starting audio playback');
       await _audioPlayer.play();
     } catch (e) {
@@ -734,163 +682,385 @@ class _CreateScreenState extends State<CreateScreen> {
     }
   }
 
+  // Modify existing _generateMusic method or add new method to use Stability AI
+  Future<void> _generateMusicWithStability() async {
+    if (_stabilityService == null) {
+      setState(() {
+        _errorMessage = 'Stability AI服务未初始化，请检查API密钥设置';
+        _statusMessage = "";
+      });
+      return;
+    }
+
+    final prompt = _promptController.text.trim();
+    if (prompt.isEmpty) {
+      setState(() {
+        _errorMessage = 'Please enter a prompt';
+      });
+      return;
+    }
+
+    // Reset cancellation status
+    _isCancelled = false;
+
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+      _generatedMusic = null;
+      _statusMessage = "Generating music with Stability AI...";
+    });
+
+    try {
+      developer.log('Starting Stability AI music generation, prompt: $prompt');
+      final Stopwatch stopwatch = Stopwatch()..start();
+      
+      // Call stability service to generate music
+      final result = await _stabilityService!.generateMusic(
+        prompt,
+        steps: 30, // 直接硬编码为30，而不是使用_generationSteps
+        durationSeconds: _durationSeconds,
+      );
+      
+      stopwatch.stop();
+      developer.log('Generation completed in ${stopwatch.elapsed.inMilliseconds} ms');
+      
+      // Check if cancelled
+      if (_isCancelled) {
+        developer.log('Generation request cancelled');
+        return;
+      }
+      
+      // Create SunoMusic object to be compatible with existing UI
+      final music = SunoMusic(
+        id: result['id'],
+        title: result['title'],
+        prompt: result['prompt'],
+        audioUrl: result['audio_url'],
+        status: result['status'],
+        createdAt: DateTime.parse(result['created_at']),
+      );
+      
+      // Update UI
+      setState(() {
+        _generatedMusic = music;
+        _generatedMusicId = music.id;
+        _isLoading = false;
+        _statusMessage = "Music generation completed!";
+      });
+      
+      // Auto-play the generated music
+      if (music.audioUrl.isNotEmpty) {
+        developer.log('Starting music playback: ${music.audioUrl}');
+        await _playAudio(music.audioUrl);
+      } else {
+        developer.log('Cannot play audio: audio URL is empty', error: 'Empty audio URL');
+        setState(() {
+          _errorMessage = 'Music generation completed, but no audio URL was provided';
+        });
+      }
+    } catch (e) {
+      if (_isCancelled) return;
+      
+      developer.log('Error generating music with Stability AI: $e', error: e);
+      setState(() {
+        _isLoading = false;
+        _errorMessage = 'Error generating music: ${e.toString()}';
+        _statusMessage = "";
+      });
+      
+      if (e.toString().contains('Failed host lookup') || 
+          e.toString().contains('Connection refused')) {
+        _showConnectionErrorDialog();
+      } else {
+        _showStabilityErrorDialog(e.toString());
+      }
+    }
+  }
+
+  // Show stability error dialog
+  void _showStabilityErrorDialog(String error) {
+    if (!mounted) return;
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Generation Failed'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Failed to generate music with Stability AI.'),
+            const SizedBox(height: 8),
+            Text('Error: $error', style: TextStyle(color: Colors.red)),
+            const SizedBox(height: 12),
+            Text('You could try:'),
+            Text('• Using a different prompt'),
+            Text('• Reducing the number of steps'),
+            Text('• Checking your internet connection'),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+            },
+            child: const Text('Close'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              _generateMusicWithStability(); // 重试
+            },
+            child: const Text('Try Again'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 测试Stability API连接
+  Future<void> _testStabilityApiConnection() async {
+    if (_stabilityService == null) {
+      setState(() {
+        _isApiConnected = false;
+        _isLoading = false;
+        _errorMessage = 'Stability AI服务未初始化，请检查API密钥设置';
+        _statusMessage = "";
+      });
+      _showConnectionErrorDialog();
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+      _statusMessage = "Testing Stability AI connection...";
+    });
+
+    try {
+      developer.log('Testing Stability AI API connection...');
+      final isConnected = await _stabilityService!.testConnection();
+      developer.log('Stability AI connection test result: $isConnected');
+      
+      setState(() {
+        _isApiConnected = isConnected;
+        _isLoading = false;
+        _statusMessage = isConnected ? "Stability AI connection successful" : "Stability AI connection failed";
+      });
+      
+      if (!isConnected) {
+        _showConnectionErrorDialog();
+      }
+    } catch (e) {
+      developer.log('Stability AI connection test error: $e', error: e);
+      setState(() {
+        _isApiConnected = false;
+        _isLoading = false;
+        _errorMessage = 'Connection error: $e';
+        _statusMessage = "";
+      });
+      _showConnectionErrorDialog();
+    }
+  }
+
+  void _showConnectionErrorDialog() {
+    if (!mounted) return;
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Connection Failed'),
+        content: const Text('Unable to connect to Stability AI API. Please check your internet connection and API key.'),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+            },
+            child: const Text('Close'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              _testStabilityApiConnection();
+            },
+            child: const Text('Retry'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 1. 添加 _showTryBackupDialog 方法
+  void _showTryBackupDialog() {
+    if (!mounted) return;
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('连接问题'),
+        content: const Text('无法连接到主要API服务器。您希望继续尝试还是使用稳定AI作为备选？'),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+            },
+            child: const Text('取消'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              _testStabilityApiConnection();
+            },
+            child: const Text('使用稳定AI'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 2. 修改 _switchApiUrl 方法以解决 sunoApiBackupUrl 不存在的问题
+  void _switchApiUrl() {
+    setState(() {
+      // 由于我们只使用Stability AI，这里简化为直接重新连接Stability API
+      _statusMessage = "正在切换到Stability AI服务...";
+    });
+    
+    developer.log('由于Suno API不可用，正在切换到Stability AI服务');
+    
+    // 直接测试Stability AI连接
+    _testStabilityApiConnection();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Generate Music'),
         actions: [
-          // Add menu button
-          PopupMenuButton<String>(
-            onSelected: (value) {
-              if (value == 'switch_api') {
-                _switchApiUrl();
-              }
+          IconButton(
+            icon: const Icon(Icons.info_outline),
+            onPressed: () {
+              showDialog(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: const Text('About Stability AI'),
+                  content: const Text('This app uses Stability AI\'s Stable Audio API to generate music based on text prompts.'),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      child: const Text('Close'),
+                    ),
+                  ],
+                ),
+              );
             },
-            itemBuilder: (context) => [
-              const PopupMenuItem(
-                value: 'switch_api',
-                child: Text('Switch API Address'),
-              ),
-            ],
+            tooltip: 'About API',
           ),
         ],
       ),
-      body: SingleChildScrollView( // Add scroll support
+      body: SingleChildScrollView(
         child: Padding(
           padding: const EdgeInsets.all(16.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // API connection status
-              Container(
-                padding: const EdgeInsets.all(8.0),
-                decoration: BoxDecoration(
-                  color: _isApiConnected ? Colors.green.shade100 : Colors.red.shade100,
-                  borderRadius: BorderRadius.circular(8.0),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      _isApiConnected ? Icons.check_circle : Icons.error,
-                      color: _isApiConnected ? Colors.green : Colors.red,
-                    ),
-                    const SizedBox(width: 8.0),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            _isApiConnected ? 'Suno API connection successful' : 'Suno API connection failed',
-                            style: TextStyle(
-                              color: _isApiConnected ? Colors.green : Colors.red,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          Text(
-                            'Current API: ${_usingBackupUrl ? 'backup address' : 'primary address'}',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey[700],
-                            ),
-                          ),
-                          // Show API quota information
-                          if (_remainingCredits != null) ...[
-                            const SizedBox(height: 4),
-                            Row(
-                              children: [
-                                Icon(
-                                  Icons.music_note,
-                                  size: 12,
-                                  color: _remainingCredits! < 10 ? Colors.red : Colors.blue,
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  'Credits: $_remainingCredits${_dailyLimit != null ? ' / $_dailyLimit' : ''}',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.bold,
-                                    color: _remainingCredits! < 10 ? Colors.red : Colors.blue,
-                                  ),
-                                ),
-                                if (_isLoadingCredits)
-                                  const SizedBox(
-                                    width: 12,
-                                    height: 12,
-                                    child: CircularProgressIndicator(strokeWidth: 1.5),
-                                  ),
-                              ],
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-                    Row(
-                      children: [
-                        // Add check credits button
-                        if (_isApiConnected) 
-                          IconButton(
-                            icon: const Icon(Icons.monetization_on, size: 20),
-                            onPressed: _isLoadingCredits ? null : _checkApiQuota,
-                            tooltip: 'Check Credits',
-                          ),
-                        IconButton(
-                          icon: const Icon(Icons.refresh),
-                          onPressed: _isLoading ? null : _testApiConnection,
-                          tooltip: 'Test Connection',
-                        ),
-                      ],
-                    ),
-                  ],
+              Text(
+                'Stability AI Music Generator',
+                style: TextStyle(
+                  fontSize: 18, 
+                  fontWeight: FontWeight.bold,
+                  color: Colors.purple[700],
                 ),
               ),
               
-              const SizedBox(height: 16.0),
+              const SizedBox(height: 16),
               
-              // Prompt input
+              ExpansionTile(
+                title: Text('Generation Settings', style: TextStyle(fontSize: 16)),
+                initiallyExpanded: false,
+                children: [
+                  ListTile(
+                    title: Text('Duration (Seconds)'),
+                    subtitle: Slider(
+                      value: _durationSeconds.toDouble(),
+                      min: 10,
+                      max: 60,
+                      divisions: 10,
+                      label: _durationSeconds.toString(),
+                      onChanged: (value) {
+                        setState(() {
+                          _durationSeconds = value.round();
+                        });
+                      },
+                    ),
+                    trailing: Text('$_durationSeconds', style: TextStyle(fontWeight: FontWeight.bold)),
+                  ),
+                  Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 16),
+                    child: Row(
+                      children: [
+                        Text('Quality Steps: ', style: TextStyle(fontWeight: FontWeight.w500)),
+                        Text('30', style: TextStyle(fontWeight: FontWeight.bold)),
+                        Text(' (fixed for optimal generation)', style: TextStyle(fontStyle: FontStyle.italic, fontSize: 12)),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 16),
+                    child: Text(
+                      'Estimated cost: ${(0.06 * 30 + 9).toStringAsFixed(1)} credits',
+                      style: TextStyle(fontStyle: FontStyle.italic),
+                    ),
+                  ),
+                ],
+              ),
+              
+              const SizedBox(height: 16),
+              
               TextField(
                 controller: _promptController,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: 'Describe the music you want',
-                  hintText: 'For example: A happy pop song with a cheerful rhythm and catchy melody',
+                  hintText: 'Example: A song in 3/4 time with cello, drums, and rhythmic claps. Sad and melancholic mood.',
                   border: OutlineInputBorder(),
                 ),
                 maxLines: 3,
-                enabled: _isApiConnected && !_isLoading,
+                enabled: !_isLoading,
               ),
               
               const SizedBox(height: 16.0),
               
-              // Generate/Cancel button
               SizedBox(
                 width: double.infinity,
                 child: _isLoading
-                    ? Row(
-                        children: [
-                          // Cancel button
-                          Expanded(
-                            child: ElevatedButton.icon(
-                              onPressed: _cancelGeneration,
-                              icon: const Icon(Icons.cancel, color: Colors.white),
-                              label: const Text('Cancel Generation'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.red,
-                                padding: const EdgeInsets.symmetric(vertical: 16.0),
-                              ),
-                            ),
-                          ),
-                        ],
+                    ? ElevatedButton.icon(
+                        onPressed: _cancelGeneration,
+                        icon: const Icon(Icons.cancel, color: Colors.white),
+                        label: const Text('Cancel Generation'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.red,
+                          padding: const EdgeInsets.symmetric(vertical: 16.0),
+                        ),
                       )
                     : ElevatedButton(
-                        onPressed: (_isApiConnected && !_isLoading) ? _generateMusic : null,
+                        onPressed: () {
+                          developer.log('Generate Music按钮被点击');
+                          
+                          if (_stabilityService == null) {
+                            _initializeStabilityService(); // 尝试重新初始化服务
+                          } else {
+                            _generateMusicWithStability(); // 正常调用生成方法
+                          }
+                        },
                         style: ElevatedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(vertical: 16.0),
+                          backgroundColor: Colors.purple,
                         ),
                         child: const Text('Generate Music'),
                       ),
               ),
               
-              // Status message and progress indicator
               if (_isLoading) ...[
                 const SizedBox(height: 16.0),
                 Row(
@@ -914,7 +1084,6 @@ class _CreateScreenState extends State<CreateScreen> {
                 ),
               ],
               
-              // Error message
               if (_errorMessage != null) ...[
                 const SizedBox(height: 16.0),
                 Container(
@@ -941,7 +1110,6 @@ class _CreateScreenState extends State<CreateScreen> {
               
               const SizedBox(height: 24.0),
               
-              // Generated result
               if (_generatedMusic != null) ...[
                 Text(
                   'Generated Music:',
@@ -955,7 +1123,6 @@ class _CreateScreenState extends State<CreateScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Optimize title display, handle possible text overflow
                         Text(
                           _safeText(_generatedMusic!.title, 'Untitled Music'),
                           style: Theme.of(context).textTheme.titleMedium,
@@ -963,7 +1130,6 @@ class _CreateScreenState extends State<CreateScreen> {
                           maxLines: 2,
                         ),
                         const SizedBox(height: 8.0),
-                        // Optimize prompt display
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -1005,29 +1171,42 @@ class _CreateScreenState extends State<CreateScreen> {
                         const Divider(height: 24),
                         const Text('Audio Controls:', style: TextStyle(fontWeight: FontWeight.bold)),
                         const SizedBox(height: 8.0),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
+                        Wrap(
+                          alignment: WrapAlignment.center,
+                          spacing: 8.0,
+                          runSpacing: 8.0,
                           children: [
-                            ElevatedButton.icon(
-                              icon: const Icon(Icons.play_arrow),
-                              label: const Text('Play'),
-                              onPressed: () => _playAudio(_generatedMusic!.audioUrl),
+                            Card(
+                              elevation: 2,
+                              shape: const CircleBorder(),
+                              child: IconButton(
+                                icon: const Icon(Icons.play_arrow, color: Colors.green),
+                                onPressed: () => _playAudio(_generatedMusic!.audioUrl),
+                                tooltip: 'Play',
+                              ),
                             ),
-                            const SizedBox(width: 8.0),
-                            ElevatedButton.icon(
-                              icon: const Icon(Icons.pause),
-                              label: const Text('Pause'),
-                              onPressed: () => _audioPlayer.pause(),
+                            const SizedBox(width: 16.0),
+                            Card(
+                              elevation: 2,
+                              shape: const CircleBorder(),
+                              child: IconButton(
+                                icon: const Icon(Icons.pause, color: Colors.blue),
+                                onPressed: () => _audioPlayer.pause(),
+                                tooltip: 'Pause',
+                              ),
                             ),
-                            const SizedBox(width: 8.0),
-                            ElevatedButton.icon(
-                              icon: const Icon(Icons.stop),
-                              label: const Text('Stop'),
-                              onPressed: () => _audioPlayer.stop(),
+                            const SizedBox(width: 16.0),
+                            Card(
+                              elevation: 2,
+                              shape: const CircleBorder(),
+                              child: IconButton(
+                                icon: const Icon(Icons.stop, color: Colors.red),
+                                onPressed: () => _audioPlayer.stop(),
+                                tooltip: 'Stop',
+                              ),
                             ),
                           ],
                         ),
-                        // Add song playback status indicator
                         if (_isPlaying) ...[
                           const SizedBox(height: 16.0),
                           const Row(
@@ -1058,25 +1237,21 @@ class _CreateScreenState extends State<CreateScreen> {
     );
   }
   
-  // Add safe text processing method, handle possible text overflow and null values
   String _safeText(String? text, String defaultValue) {
     if (text == null || text.isEmpty) {
       return defaultValue;
     }
     
     try {
-      // Filter out non-printable characters and control characters
       final filteredText = text
           .replaceAll(RegExp(r'[\p{Cc}\p{Cf}\p{Co}\p{Cn}]', unicode: true), '')
           .trim();
           
-      // If the filtered text length is significantly shorter or empty, it might be corrupted
       if (filteredText.isEmpty || filteredText.length < text.length / 2) {
         developer.log('Detected potentially corrupted text: $text');
         return defaultValue;
       }
       
-      // Check if the text contains too many special characters
       if (filteredText.runes.where((rune) => 
         (rune < 32 || (rune > 126 && rune < 160)) && 
         rune != 10 && rune != 13).length > filteredText.length / 3) {
@@ -1093,17 +1268,100 @@ class _CreateScreenState extends State<CreateScreen> {
 
   String? getMusicId(dynamic response) {
     if (response is List && response.isNotEmpty) {
-      // If it's a list, take the first element
       final firstItem = response[0];
       if (firstItem is Map && firstItem.containsKey('id')) {
         return firstItem['id'].toString();
       }
     } else if (response is Map && response.containsKey('id')) {
-      // If it's a Map object directly
       return response['id'].toString();
     }
     
-    // Cant find ID
     return null;
+  }
+
+  // 添加这个辅助方法用于重新初始化服务
+  Future<void> _initializeStabilityService() async {
+    setState(() {
+      _isLoading = true;
+      _statusMessage = "正在尝试初始化Stability AI服务...";
+      _errorMessage = null;
+    });
+    
+    try {
+      developer.log('尝试初始化StabilityAudioService...');
+      
+      // 这里使用简单的HTTP请求检查网络连接
+      try {
+        final testResponse = await http.get(Uri.parse('https://api.stability.ai/v1/engines/list'));
+        developer.log('测试API连接状态码: ${testResponse.statusCode}');
+      } catch (netError) {
+        developer.log('API连接测试失败: $netError');
+      }
+      
+      final apiKey = AppConfig.stabilityApiKey;
+      developer.log('API密钥诊断: ${AppConfig.getStabilityApiKeyStatus()}');
+      
+      _stabilityService = StabilityAudioService(apiKey: apiKey);
+      developer.log('StabilityAudioService初始化成功');
+      
+      setState(() {
+        _isLoading = false;
+        _statusMessage = "Stability AI服务初始化成功，现在可以生成音乐";
+        _errorMessage = null;
+      });
+    } catch (e) {
+      developer.log('StabilityAudioService初始化失败: $e', error: e);
+      setState(() {
+        _isLoading = false;
+        _errorMessage = "无法初始化Stability AI服务: $e，请检查以下几点：\n1. 确保网络连接正常\n2. API密钥格式是否正确\n3. 应用是否具有网络权限";
+        _statusMessage = "初始化失败";
+      });
+      
+      // 显示更多诊断信息
+      _showDetailedErrorDialog("初始化服务失败", e.toString());
+    }
+  }
+
+  // 显示详细的错误信息对话框
+  void _showDetailedErrorDialog(String title, String errorMessage) {
+    if (!mounted) return;
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('错误详情: $errorMessage'),
+              const SizedBox(height: 16),
+              const Text('API配置信息:'),
+              Text('API密钥状态: ${AppConfig.getStabilityApiKeyStatus()}'),
+              Text('API URL: ${AppConfig.getStabilityAudioUrl()}'),
+              const SizedBox(height: 16),
+              const Text('可能的解决方案:'),
+              const Text('• 检查网络连接'),
+              const Text('• 确认API密钥是否正确'),
+              const Text('• 重新启动应用'),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('关闭'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _initializeStabilityService();
+            },
+            child: const Text('重试'),
+          ),
+        ],
+      ),
+    );
   }
 } 

@@ -1,0 +1,52 @@
+2025-04-06 15:21:45,603 - INFO - === Stability AI API 测试开始 ===
+2025-04-06 15:21:45,603 - INFO - 请求端点: https://api.stability.ai/v2beta/audio/stable-audio-2/text-to-audio
+2025-04-06 15:21:45,603 - INFO - 生成提示词: A song in the 3/4 time signature that features cheerful acoustic guitar, live recorded drums, and rhythmic claps, The mood is happy and up-lifting.
+2025-04-06 15:21:45,603 - INFO - 音频设置: 格式=mp3, 时长=20秒, 步数=30
+2025-04-06 15:21:45,603 - INFO - 发送API请求...
+2025-04-06 15:21:45,610 - DEBUG - Starting new HTTPS connection (1): api.stability.ai:443
+2025-04-06 15:21:52,762 - DEBUG - https://api.stability.ai:443 "POST /v2beta/audio/stable-audio-2/text-to-audio HTTP/11" 200 320827
+2025-04-06 15:21:52,833 - INFO - 请求完成，耗时: 7.23秒
+2025-04-06 15:21:52,833 - INFO - 响应状态码: 200
+2025-04-06 15:21:52,833 - INFO - 响应Content-Type: audio/mpeg
+2025-04-06 15:21:52,833 - INFO - 成功接收音频数据，大小: 320827 字节
+2025-04-06 15:21:52,834 - INFO - 音频文件保存至: ./output/stability_audio_1743949305.mp3
+2025-04-06 15:21:52,835 - INFO - === Stability AI API 测试结束 ===
+2025-04-06 15:22:42,466 - INFO - === Stability AI API 测试开始 ===
+2025-04-06 15:22:42,466 - INFO - 请求端点: https://api.stability.ai/v2beta/audio/stable-audio-2/text-to-audio
+2025-04-06 15:22:42,466 - INFO - 生成提示词: A song in the 3/4 time signature that features cello, live recorded drums, and rhythmic claps, The mood is sad and depressing.
+2025-04-06 15:22:42,466 - INFO - 音频设置: 格式=mp3, 时长=20秒, 步数=30
+2025-04-06 15:22:42,466 - INFO - 发送API请求...
+2025-04-06 15:22:42,474 - DEBUG - Starting new HTTPS connection (1): api.stability.ai:443
+2025-04-06 15:22:48,413 - DEBUG - https://api.stability.ai:443 "POST /v2beta/audio/stable-audio-2/text-to-audio HTTP/11" 200 320827
+2025-04-06 15:22:48,662 - INFO - 请求完成，耗时: 6.20秒
+2025-04-06 15:22:48,662 - INFO - 响应状态码: 200
+2025-04-06 15:22:48,662 - INFO - 响应Content-Type: audio/mpeg
+2025-04-06 15:22:48,663 - INFO - 成功接收音频数据，大小: 320827 字节
+2025-04-06 15:22:48,664 - INFO - 音频文件保存至: ./output/stability_audio_1743949362.mp3
+2025-04-06 15:22:48,665 - INFO - === Stability AI API 测试结束 ===
+2025-04-06 15:33:20,857 - INFO - === Stability AI API 测试开始 ===
+2025-04-06 15:33:20,857 - INFO - 请求端点: https://api.stability.ai/v2beta/audio/stable-audio-2/text-to-audio
+2025-04-06 15:33:20,857 - INFO - 生成提示词: A song in the 3/4 time signature that features cello, live recorded drums, and rhythmic claps, The mood is sad and depressing.
+2025-04-06 15:33:20,857 - INFO - 音频设置: 格式=mp3, 时长=20秒, 步数=30
+2025-04-06 15:33:20,857 - INFO - 发送API请求...
+2025-04-06 15:33:20,865 - DEBUG - Starting new HTTPS connection (1): api.stability.ai:443
+2025-04-06 15:33:22,156 - DEBUG - https://api.stability.ai:443 "POST /v2beta/audio/stable-audio-2/text-to-audio HTTP/11" 402 224
+2025-04-06 15:33:22,158 - INFO - 请求完成，耗时: 1.30秒
+2025-04-06 15:33:22,158 - INFO - 响应状态码: 402
+2025-04-06 15:33:22,158 - INFO - 响应Content-Type: application/json
+2025-04-06 15:33:22,158 - ERROR - API请求失败: 402
+2025-04-06 15:33:22,158 - ERROR - 错误详情: {"errors": ["You lack sufficient credits to make this request.  Please purchase more credits at https://platform.stability.ai/account/credits and try again."], "id": "c5ab509d9fd018bca61af001a9d93310", "name": "payment_required"}
+2025-04-06 15:33:22,158 - INFO - === Stability AI API 测试结束 ===
+2025-04-06 21:05:02,137 - INFO - === Stability AI API 测试开始 ===
+2025-04-06 21:05:02,137 - INFO - 请求端点: https://api.stability.ai/v2beta/audio/stable-audio-2/text-to-audio
+2025-04-06 21:05:02,137 - INFO - 生成提示词: A song in the 3/4 time signature that features cello, live recorded drums, and rhythmic claps, The mood is calm and depressing.
+2025-04-06 21:05:02,137 - INFO - 音频设置: 格式=mp3, 时长=20秒, 步数=30
+2025-04-06 21:05:02,137 - INFO - 发送API请求...
+2025-04-06 21:05:02,145 - DEBUG - Starting new HTTPS connection (1): api.stability.ai:443
+2025-04-06 21:05:09,103 - DEBUG - https://api.stability.ai:443 "POST /v2beta/audio/stable-audio-2/text-to-audio HTTP/11" 200 320827
+2025-04-06 21:05:09,279 - INFO - 请求完成，耗时: 7.14秒
+2025-04-06 21:05:09,280 - INFO - 响应状态码: 200
+2025-04-06 21:05:09,280 - INFO - 响应Content-Type: audio/mpeg
+2025-04-06 21:05:09,280 - INFO - 成功接收音频数据，大小: 320827 字节
+2025-04-06 21:05:09,282 - INFO - 音频文件保存至: ./output/stability_audio_1743969902.mp3
+2025-04-06 21:05:09,282 - INFO - === Stability AI API 测试结束 ===

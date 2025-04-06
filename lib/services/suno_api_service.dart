@@ -87,7 +87,12 @@ class SunoApiService {
           
       _logger.i('Generate music URL: $url');
       
-      final requestBody = {'prompt': prompt};
+      final requestBody = {
+        'prompt': prompt,
+        'wait_audio': true  // 关键修改：设置为true，使用同步模式
+      };
+      
+      _logger.i('Request body: ${json.encode(requestBody)}');
       
       final response = await _client.post(
         Uri.parse(url),
@@ -100,6 +105,7 @@ class SunoApiService {
       if (response.statusCode == 200 || response.statusCode == 201) {
         return json.decode(response.body);
       } else {
+        _logger.e('API error response: ${response.body}');
         throw Exception('Failed to generate music: ${response.statusCode}');
       }
     } catch (e) {
@@ -134,6 +140,72 @@ class SunoApiService {
       }
     } catch (e) {
       _logger.e('Failed to get music info: $e');
+      throw e;
+    }
+  }
+  
+  // 添加新方法以使用custom_generate端点
+  Future<dynamic> generateCustomMusic({
+    required String prompt, 
+    String? tags,
+    String? title,
+    bool makeInstrumental = false,
+    bool waitAudio = true  // 默认设为true以使用同步模式
+  }) async {
+    _logger.i('Generate custom music request:');
+    _logger.i('- Prompt: $prompt');
+    _logger.i('- Tags: $tags');
+    _logger.i('- Title: $title');
+    _logger.i('- Make instrumental: $makeInstrumental');
+    _logger.i('- Wait audio: $waitAudio');
+    
+    try {
+      // 构建正确的URL，避免重复/api
+      final url = baseUrl.endsWith('/api') 
+          ? '$baseUrl/custom_generate'  // 如果baseUrl已包含/api
+          : '$baseUrl/api/custom_generate';  // 如果baseUrl不包含/api
+          
+      _logger.i('Generate custom music URL: $url');
+      
+      // 构建请求体，只包含非空值
+      final Map<String, dynamic> requestBody = {
+        'prompt': prompt,
+        'wait_audio': waitAudio,
+      };
+      
+      // 添加可选参数（如果提供）
+      if (tags != null && tags.isNotEmpty) {
+        requestBody['tags'] = tags;
+      }
+      
+      if (title != null && title.isNotEmpty) {
+        requestBody['title'] = title;
+      }
+      
+      if (makeInstrumental) {
+        requestBody['make_instrumental'] = true;
+      }
+      
+      _logger.i('Request body: ${json.encode(requestBody)}');
+      
+      final response = await _client.post(
+        Uri.parse(url),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode(requestBody),
+      ).timeout(Duration(seconds: AppConfig.generateMusicTimeoutSeconds));
+      
+      _logger.i('Custom generation response code: ${response.statusCode}');
+      
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        var responseData = json.decode(response.body);
+        _logger.i('Custom generation successful');
+        return responseData;
+      } else {
+        _logger.e('API error response: ${response.body}');
+        throw Exception('Failed to generate custom music: ${response.statusCode}');
+      }
+    } catch (e) {
+      _logger.e('Failed to generate custom music: $e');
       throw e;
     }
   }
