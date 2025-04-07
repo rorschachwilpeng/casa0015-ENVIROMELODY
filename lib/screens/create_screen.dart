@@ -12,6 +12,9 @@ import '../services/stability_audio_service.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import '../models/music_item.dart';
+import '../services/music_library_manager.dart';
+import '../services/audio_player_manager.dart';
 
 class CreateScreen extends StatefulWidget {
   const CreateScreen({Key? key}) : super(key: key);
@@ -25,6 +28,7 @@ class _CreateScreenState extends State<CreateScreen> {
   late SunoApiService _apiService;
   final Logger _logger = Logger();
   final AudioPlayer _audioPlayer = AudioPlayer();
+  final AudioPlayerManager _audioPlayerManager = AudioPlayerManager();
   
   bool _isLoading = false;
   bool _isApiConnected = false;
@@ -51,51 +55,51 @@ class _CreateScreenState extends State<CreateScreen> {
   
   // Add new variables
   StabilityAudioService? _stabilityService;
-  final int _generationSteps = 30; // 固定为30步，不可调整
+  final int _generationSteps = 30; // Fixed at 30 steps, cannot be adjusted
   int _durationSeconds = AppConfig.defaultAudioDurationSeconds;
 
   @override
   void initState() {
     super.initState();
     
-    // 初始化API服务（缺少这行代码可能导致其他错误）
-    // 即使我们现在只使用Stability AI，其他方法可能仍然依赖这个服务
+    // Initialize the API service (missing this line may cause other errors)
+    // Even though we only use Stability AI now, other methods may still depend on this service
     _apiService = SunoApiService(baseUrl: AppConfig.sunoApiBaseUrl);
     
-    // 输出诊断信息
+    // Output diagnostic information
     final diagnostics = AppConfig.getDiagnosticInfo();
-    developer.log('Stability AI 配置诊断信息:');
-    developer.log('API密钥状态: ${diagnostics["stabilityApiKeyStatus"]}');
+    developer.log('Stability AI configuration diagnostic information:');
+    developer.log('API key status: ${diagnostics["stabilityApiKeyStatus"]}');
     developer.log('API URL: ${diagnostics["stabilityApiUrl"]}');
     
     try {
-      developer.log('开始初始化StabilityAudioService...');
+      developer.log('Starting to initialize StabilityAudioService...');
       if (AppConfig.isStabilityApiKeyValid()) {
-        developer.log('API密钥格式验证通过');
+        developer.log('API key format validation passed');
         
-        // 尝试创建服务实例
+        // Try to create a service instance
         try {
           final apiKey = AppConfig.stabilityApiKey;
-          developer.log('创建服务实例，使用API密钥: ${apiKey.substring(0, 5)}...');
+          developer.log('Creating service instance, using API key: ${apiKey.substring(0, 5)}...');
           
           _stabilityService = StabilityAudioService(apiKey: apiKey);
-          developer.log('StabilityAudioService实例创建成功');
+          developer.log('StabilityAudioService instance created successfully');
         } catch (serviceError) {
-          developer.log('创建服务实例失败: $serviceError', error: serviceError);
+          developer.log('Failed to create service instance: $serviceError', error: serviceError);
           setState(() {
-            _errorMessage = "创建Stability AI服务实例失败: $serviceError";
+            _errorMessage = "Failed to create Stability AI service instance: $serviceError";
           });
         }
       } else {
-        developer.log('API密钥验证失败: ${AppConfig.getStabilityApiKeyStatus()}');
+        developer.log('API key validation failed: ${AppConfig.getStabilityApiKeyStatus()}');
         setState(() {
-          _errorMessage = "Stability API密钥无效: ${AppConfig.getStabilityApiKeyStatus()}";
+          _errorMessage = "Stability API key is invalid: ${AppConfig.getStabilityApiKeyStatus()}";
         });
       }
     } catch (e) {
-      developer.log('整体初始化过程出错: $e', error: e);
+      developer.log('Overall initialization process error: $e', error: e);
       setState(() {
-        _errorMessage = "无法初始化Stability AI服务: $e";
+        _errorMessage = "Failed to initialize Stability AI service: $e";
       });
     }
     
@@ -105,6 +109,9 @@ class _CreateScreenState extends State<CreateScreen> {
         _isPlaying = state.playing;
       });
     });
+    
+    // Listen to the audio playback status change
+    _audioPlayerManager.addListener(_onAudioPlayerChanged);
   }
 
   @override
@@ -113,7 +120,14 @@ class _CreateScreenState extends State<CreateScreen> {
     _audioPlayer.dispose();
     _cancelPolling();
     _stabilityService?.dispose();
+    _audioPlayerManager.removeListener(_onAudioPlayerChanged);
     super.dispose();
+  }
+
+  void _onAudioPlayerChanged() {
+    if (mounted) {
+      setState(() {});
+    }
   }
 
   // Cancel polling and generation process
@@ -450,7 +464,7 @@ class _CreateScreenState extends State<CreateScreen> {
             // Auto-play the generated music
             if (sunoMusic.audioUrl.isNotEmpty) {
               developer.log('Starting music playback: ${sunoMusic.audioUrl}');
-              await _playAudio(sunoMusic.audioUrl);
+              _playAudio(sunoMusic.audioUrl);
             } else {
               developer.log('Cannot play audio: audio URL is empty', error: 'Empty audio URL');
               setState(() {
@@ -610,22 +624,16 @@ class _CreateScreenState extends State<CreateScreen> {
   // Play audio
   Future<void> _playAudio(String url) async {
     try {
-      developer.log('Setting audio URL: $url');
-      
-      // Check if it's a local file
-      if (url.startsWith('/')) {
-        await _audioPlayer.setFilePath(url);
-      } else {
-        await _audioPlayer.setUrl(url);
-      }
-      
-      developer.log('Starting audio playback');
-      await _audioPlayer.play();
+      // Use a temporary ID, or use the actual music ID
+      final tempId = 'temp_${DateTime.now().millisecondsSinceEpoch}';
+      await _audioPlayerManager.playMusic(tempId, url);
     } catch (e) {
-      developer.log('Error playing audio: $e', error: e);
-      setState(() {
-        _errorMessage = 'Unable to play audio: $e';
-      });
+      developer.log('Failed to play audio: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to play audio: ${e.toString()}')),
+        );
+      }
     }
   }
 
@@ -686,7 +694,7 @@ class _CreateScreenState extends State<CreateScreen> {
   Future<void> _generateMusicWithStability() async {
     if (_stabilityService == null) {
       setState(() {
-        _errorMessage = 'Stability AI服务未初始化，请检查API密钥设置';
+        _errorMessage = 'Stability AI service not initialized, please check API key settings';
         _statusMessage = "";
       });
       return;
@@ -717,7 +725,7 @@ class _CreateScreenState extends State<CreateScreen> {
       // Call stability service to generate music
       final result = await _stabilityService!.generateMusic(
         prompt,
-        steps: 30, // 直接硬编码为30，而不是使用_generationSteps
+        steps: 30, // Directly hardcode to 30, not using _generationSteps
         durationSeconds: _durationSeconds,
       );
       
@@ -750,8 +758,61 @@ class _CreateScreenState extends State<CreateScreen> {
       
       // Auto-play the generated music
       if (music.audioUrl.isNotEmpty) {
-        developer.log('Starting music playback: ${music.audioUrl}');
-        await _playAudio(music.audioUrl);
+        developer.log('Music generation successful, URL: ${music.audioUrl}', name: 'CreateScreen');
+        
+        // Determine the URL type
+        String audioUrl = music.audioUrl;
+        bool isLocalFile = audioUrl.startsWith('/') || 
+                           (audioUrl.length > 1 && audioUrl[1] == ':') || // Windows path
+                           audioUrl.startsWith('file://');
+        
+        // Do not automatically add the base URL, keep the original path
+        // If it is a local file path, use it directly
+        if (isLocalFile && !audioUrl.startsWith('file://')) {
+          audioUrl = 'file://$audioUrl';
+        }
+        
+        developer.log('Processed audio URL: $audioUrl', name: 'CreateScreen');
+        
+        // Create MusicItem object
+        final musicItem = MusicItem(
+          id: music.id,
+          title: music.title.isEmpty ? 'Stability Music ${DateTime.now().toString().substring(0, 16)}' : music.title,
+          prompt: prompt,
+          audioUrl: audioUrl, // Use the processed URL
+          status: 'complete',
+          createdAt: DateTime.now(),
+        );
+        
+        // Save to the music library
+        try {
+          await MusicLibraryManager().addMusic(musicItem);
+          
+          // Show success prompt
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: const Text('Music has been added to the music library'),
+                action: SnackBarAction(
+                  label: 'View',
+                  onPressed: () {
+                    Navigator.of(context).pushNamed('/library');
+                  },
+                ),
+                duration: const Duration(seconds: 3),
+              ),
+            );
+          }
+        } catch (e) {
+          developer.log('Failed to save music: $e', error: e, name: 'CreateScreen');
+          
+          // Show error prompt
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Failed to save music: ${e.toString()}')),
+            );
+          }
+        }
       } else {
         developer.log('Cannot play audio: audio URL is empty', error: 'Empty audio URL');
         setState(() {
@@ -818,13 +879,13 @@ class _CreateScreenState extends State<CreateScreen> {
     );
   }
 
-  // 测试Stability API连接
+  // Test Stability API connection
   Future<void> _testStabilityApiConnection() async {
     if (_stabilityService == null) {
       setState(() {
         _isApiConnected = false;
         _isLoading = false;
-        _errorMessage = 'Stability AI服务未初始化，请检查API密钥设置';
+        _errorMessage = 'Stability AI service not initialized, please check API key settings';
         _statusMessage = "";
       });
       _showConnectionErrorDialog();
@@ -890,44 +951,44 @@ class _CreateScreenState extends State<CreateScreen> {
     );
   }
 
-  // 1. 添加 _showTryBackupDialog 方法
+  // 1. Add _showTryBackupDialog method
   void _showTryBackupDialog() {
     if (!mounted) return;
     
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('连接问题'),
-        content: const Text('无法连接到主要API服务器。您希望继续尝试还是使用稳定AI作为备选？'),
+        title: const Text('Connection problem'),
+        content: const Text('Unable to connect to the main API server. Do you want to continue trying or use Stability AI as a backup?'),
         actions: [
           TextButton(
             onPressed: () {
               Navigator.of(context).pop();
             },
-            child: const Text('取消'),
+            child: const Text('Cancel'),
           ),
           TextButton(
             onPressed: () {
               Navigator.of(context).pop();
               _testStabilityApiConnection();
             },
-            child: const Text('使用稳定AI'),
+            child: const Text('Use Stability Stability AI'),
           ),
         ],
       ),
     );
   }
 
-  // 2. 修改 _switchApiUrl 方法以解决 sunoApiBackupUrl 不存在的问题
+  // 2. Modify _switchApiUrl method to solve the problem that sunoApiBackupUrl does not exist
   void _switchApiUrl() {
     setState(() {
-      // 由于我们只使用Stability AI，这里简化为直接重新连接Stability API
-      _statusMessage = "正在切换到Stability AI服务...";
+      // Since we only use Stability AI, here it is simplified to directly reconnect to the Stability API
+      _statusMessage = "Switching to Stability AI service...";
     });
     
-    developer.log('由于Suno API不可用，正在切换到Stability AI服务');
+    developer.log('Since the Suno API is unavailable, switching to the Stability AI service...');
     
-    // 直接测试Stability AI连接
+    // Directly test the Stability AI connection
     _testStabilityApiConnection();
   }
 
@@ -1171,42 +1232,7 @@ class _CreateScreenState extends State<CreateScreen> {
                         const Divider(height: 24),
                         const Text('Audio Controls:', style: TextStyle(fontWeight: FontWeight.bold)),
                         const SizedBox(height: 8.0),
-                        Wrap(
-                          alignment: WrapAlignment.center,
-                          spacing: 8.0,
-                          runSpacing: 8.0,
-                          children: [
-                            Card(
-                              elevation: 2,
-                              shape: const CircleBorder(),
-                              child: IconButton(
-                                icon: const Icon(Icons.play_arrow, color: Colors.green),
-                                onPressed: () => _playAudio(_generatedMusic!.audioUrl),
-                                tooltip: 'Play',
-                              ),
-                            ),
-                            const SizedBox(width: 16.0),
-                            Card(
-                              elevation: 2,
-                              shape: const CircleBorder(),
-                              child: IconButton(
-                                icon: const Icon(Icons.pause, color: Colors.blue),
-                                onPressed: () => _audioPlayer.pause(),
-                                tooltip: 'Pause',
-                              ),
-                            ),
-                            const SizedBox(width: 16.0),
-                            Card(
-                              elevation: 2,
-                              shape: const CircleBorder(),
-                              child: IconButton(
-                                icon: const Icon(Icons.stop, color: Colors.red),
-                                onPressed: () => _audioPlayer.stop(),
-                                tooltip: 'Stop',
-                              ),
-                            ),
-                          ],
-                        ),
+                        _buildAudioControls(),
                         if (_isPlaying) ...[
                           const SizedBox(height: 16.0),
                           const Row(
@@ -1279,50 +1305,50 @@ class _CreateScreenState extends State<CreateScreen> {
     return null;
   }
 
-  // 添加这个辅助方法用于重新初始化服务
+  // Add this helper method for re-initializing the service
   Future<void> _initializeStabilityService() async {
     setState(() {
       _isLoading = true;
-      _statusMessage = "正在尝试初始化Stability AI服务...";
+      _statusMessage = "Attempting to initialize Stability AI service...";
       _errorMessage = null;
     });
     
     try {
-      developer.log('尝试初始化StabilityAudioService...');
+      developer.log('Attempting to initialize StabilityAudioService...');
       
-      // 这里使用简单的HTTP请求检查网络连接
+      // Here we use a simple HTTP request to check the network connection
       try {
         final testResponse = await http.get(Uri.parse('https://api.stability.ai/v1/engines/list'));
-        developer.log('测试API连接状态码: ${testResponse.statusCode}');
+        developer.log('Test API connection status code: ${testResponse.statusCode}');
       } catch (netError) {
-        developer.log('API连接测试失败: $netError');
+        developer.log('API connection test failed: $netError');
       }
       
       final apiKey = AppConfig.stabilityApiKey;
-      developer.log('API密钥诊断: ${AppConfig.getStabilityApiKeyStatus()}');
+      developer.log('API key diagnostic: ${AppConfig.getStabilityApiKeyStatus()}');
       
       _stabilityService = StabilityAudioService(apiKey: apiKey);
-      developer.log('StabilityAudioService初始化成功');
+      developer.log('StabilityAudioService initialized successfully');
       
       setState(() {
         _isLoading = false;
-        _statusMessage = "Stability AI服务初始化成功，现在可以生成音乐";
+        _statusMessage = "Stability AI service initialized successfully, now you can generate music";
         _errorMessage = null;
       });
     } catch (e) {
-      developer.log('StabilityAudioService初始化失败: $e', error: e);
+      developer.log('StabilityAudioService initialization failed: $e', error: e);
       setState(() {
         _isLoading = false;
-        _errorMessage = "无法初始化Stability AI服务: $e，请检查以下几点：\n1. 确保网络连接正常\n2. API密钥格式是否正确\n3. 应用是否具有网络权限";
-        _statusMessage = "初始化失败";
+        _errorMessage = "Failed to initialize Stability AI service: $e, please check the following points:\n1. Ensure the network connection is normal\n2. Whether the API key format is correct\n3. Whether the application has network permissions";
+        _statusMessage = "Initialization failed";
       });
       
-      // 显示更多诊断信息
-      _showDetailedErrorDialog("初始化服务失败", e.toString());
+      // Show more diagnostic information
+      _showDetailedErrorDialog("Initialization failed", e.toString());
     }
   }
 
-  // 显示详细的错误信息对话框
+  // Show detailed error information dialog
   void _showDetailedErrorDialog(String title, String errorMessage) {
     if (!mounted) return;
     
@@ -1335,33 +1361,62 @@ class _CreateScreenState extends State<CreateScreen> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('错误详情: $errorMessage'),
+              Text('Error details: $errorMessage'),
               const SizedBox(height: 16),
-              const Text('API配置信息:'),
-              Text('API密钥状态: ${AppConfig.getStabilityApiKeyStatus()}'),
+              const Text('API configuration information:'),
+              Text('API key status: ${AppConfig.getStabilityApiKeyStatus()}'),
               Text('API URL: ${AppConfig.getStabilityAudioUrl()}'),
               const SizedBox(height: 16),
-              const Text('可能的解决方案:'),
-              const Text('• 检查网络连接'),
-              const Text('• 确认API密钥是否正确'),
-              const Text('• 重新启动应用'),
+              const Text('Possible solutions:'),
+              const Text('• Check the network connection'),
+              const Text('• Confirm whether the API key is correct'),
+              const Text('• Restart the application'),
             ],
           ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('关闭'),
+            child: const Text('Close'),
           ),
           TextButton(
             onPressed: () {
               Navigator.pop(context);
               _initializeStabilityService();
             },
-            child: const Text('重试'),
+            child: const Text('Retry'),
           ),
         ],
       ),
+    );
+  }
+
+  // Build audio control buttons
+  Widget _buildAudioControls() {
+    final bool isPlaying = _audioPlayerManager.isPlaying;
+    
+    return Wrap(
+      spacing: 8.0,
+      children: [
+        ElevatedButton.icon(
+          icon: Icon(isPlaying ? Icons.pause : Icons.play_arrow),
+          label: Text(isPlaying ? 'Pause' : 'Play'),
+          onPressed: () {
+            if (isPlaying) {
+              _audioPlayerManager.pauseMusic();
+            } else {
+              _audioPlayerManager.resumeMusic();
+            }
+          },
+        ),
+        ElevatedButton.icon(
+          icon: const Icon(Icons.stop),
+          label: const Text('Stop'),
+          onPressed: () {
+            _audioPlayerManager.stopMusic();
+          },
+        ),
+      ],
     );
   }
 } 

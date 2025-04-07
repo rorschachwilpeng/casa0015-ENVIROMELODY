@@ -16,20 +16,20 @@ class SunoMusic {
   });
   
   factory SunoMusic.fromJson(Map<String, dynamic> json) {
-    // 尝试获取嵌套在内部的音乐数据
+    // Try to get the nested music data
     Map<String, dynamic> musicData = json;
     
-    // 如果响应中有data或music字段，则尝试从中获取音乐信息
+    // If the response contains the data or music field, try to get the music information
     if (json.containsKey('data') && json['data'] is Map) {
       musicData = json['data'];
     } else if (json.containsKey('music') && json['music'] is Map) {
       musicData = json['music'];
     } else if (json.containsKey('result') && json['result'] is Map) {
-      // Vercel API可能会将结果包装在result字段中
+      // Vercel API may wrap the result in the result field
       musicData = json['result'];
     }
 
-    // 尝试各种可能的字段名称 - 适配Vercel API可能的不同响应格式
+    // Try various possible field names - adapt to different response formats of Vercel API
     String? audioUrl = musicData['audio_url'] ?? 
                       musicData['audioUrl'] ?? 
                       musicData['url'] ?? 
@@ -50,14 +50,14 @@ class SunoMusic {
                          musicData['state'] ??
                          'unknown';
 
-    // 辅助函数：安全获取ID
+    // Helper function: safe get ID
     String safeGetId() {
-      // 直接从musicData获取
+      // Get directly from musicData
       if (musicData.containsKey('id') && musicData['id'] != null) {
         return musicData['id'].toString();
       }
       
-      // 从路径或URL中提取
+      // Extract from path or URL
       if (musicData.containsKey('path') && musicData['path'] != null) {
         final String path = musicData['path'].toString();
         final RegExp idRegex = RegExp(r'([a-zA-Z0-9]{8,})');
@@ -67,7 +67,7 @@ class SunoMusic {
         }
       }
       
-      // 从audioUrl中提取
+      // Extract from audioUrl
       if (audioUrl != null && audioUrl.isNotEmpty) {
         final RegExp idRegex = RegExp(r'([a-zA-Z0-9]{8,})\.mp3');
         final match = idRegex.firstMatch(audioUrl);

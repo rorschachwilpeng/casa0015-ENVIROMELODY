@@ -144,13 +144,13 @@ class SunoApiService {
     }
   }
   
-  // 添加新方法以使用custom_generate端点
+  // Add new method to use custom_generate endpoint    
   Future<dynamic> generateCustomMusic({
     required String prompt, 
     String? tags,
     String? title,
     bool makeInstrumental = false,
-    bool waitAudio = true  // 默认设为true以使用同步模式
+    bool waitAudio = true  // Default set to true to use synchronous mode
   }) async {
     _logger.i('Generate custom music request:');
     _logger.i('- Prompt: $prompt');
@@ -160,20 +160,20 @@ class SunoApiService {
     _logger.i('- Wait audio: $waitAudio');
     
     try {
-      // 构建正确的URL，避免重复/api
+      // Build the correct URL, avoid duplicating /api
       final url = baseUrl.endsWith('/api') 
-          ? '$baseUrl/custom_generate'  // 如果baseUrl已包含/api
-          : '$baseUrl/api/custom_generate';  // 如果baseUrl不包含/api
+          ? '$baseUrl/custom_generate'  // If baseUrl already contains /api
+          : '$baseUrl/api/custom_generate';  // If baseUrl doesn't contain /api
           
       _logger.i('Generate custom music URL: $url');
       
-      // 构建请求体，只包含非空值
+      // Build the request body, only include non-empty values
       final Map<String, dynamic> requestBody = {
         'prompt': prompt,
         'wait_audio': waitAudio,
       };
       
-      // 添加可选参数（如果提供）
+      // Add optional parameters (if provided)
       if (tags != null && tags.isNotEmpty) {
         requestBody['tags'] = tags;
       }
