@@ -870,7 +870,7 @@ class _CreateScreenState extends State<CreateScreen> {
           TextButton(
             onPressed: () {
               Navigator.of(context).pop();
-              _generateMusicWithStability(); // 重试
+              _generateMusicWithStability(); // Retry
             },
             child: const Text('Try Again'),
           ),
@@ -1109,9 +1109,9 @@ class _CreateScreenState extends State<CreateScreen> {
                           developer.log('Generate Music按钮被点击');
                           
                           if (_stabilityService == null) {
-                            _initializeStabilityService(); // 尝试重新初始化服务
+                            _initializeStabilityService(); // Try to reinitialize the service
                           } else {
-                            _generateMusicWithStability(); // 正常调用生成方法
+                            _generateMusicWithStability(); // Normal call to generate method
                           }
                         },
                         style: ElevatedButton.styleFrom(

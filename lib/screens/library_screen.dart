@@ -228,7 +228,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
                             },
                           ),
                           onTap: () {
-                            // 可以导航到详情页面
+                            // You can navigate to the details page
                             // Navigator.of(context).push(
                             //   MaterialPageRoute(
                             //     builder: (context) => MusicDetailScreen(music: music),

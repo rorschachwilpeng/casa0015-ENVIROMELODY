@@ -25,36 +25,36 @@ class AppConfig {
   
   // Other configs...
   
-  // 辅助方法：验证API密钥
+  // Helper method: Validate API key
   static bool isStabilityApiKeyValid() {
     return stabilityApiKey.isNotEmpty && 
            stabilityApiKey.startsWith("sk-") && 
            stabilityApiKey.length > 20;
   }
   
-  // 辅助方法：获取API密钥状态信息
+  // Helper method: Get API key status information
   static String getStabilityApiKeyStatus() {
     if (stabilityApiKey.isEmpty) {
-      return "API密钥为空";
+      return "API key is empty";
     } else if (!stabilityApiKey.startsWith("sk-")) {
-      return "API密钥格式不正确，应以'sk-'开头";
+      return "API key format is incorrect, should start with 'sk-'";
     } else if (stabilityApiKey.length < 20) {
-      return "API密钥长度不足，可能不是有效密钥";
+      return "API key is too short, possibly not a valid key";
     } else {
-      return "API密钥格式有效，长度: ${stabilityApiKey.length}";
+      return "API key format is valid, length: ${stabilityApiKey.length}";
     }
   }
   
-  // Stability AI API基础URL
+  // Stability AI API base URL
   static const String stabilityApiBaseUrl = "https://api.stability.ai";
   static const String stabilityAudioEndpoint = "/v2beta/audio/generations";
   
-  // 获取完整的API URL
+  // Get full API URL
   static String getStabilityAudioUrl() {
     return "$stabilityApiBaseUrl$stabilityAudioEndpoint";
   }
   
-  // 诊断信息：显示所有配置的概要
+  // Diagnostic information: Display summary of all configurations
   static Map<String, dynamic> getDiagnosticInfo() {
     return {
       "stabilityApiKeyValid": isStabilityApiKeyValid(),
