@@ -5,51 +5,51 @@ import 'dart:developer' as developer;
 import 'package:flutter/material.dart';
 import 'package:latlong2/latlong.dart';
 
-/// 天气服务类 - 负责与OpenWeather API通信获取天气数据
+/// Weather service class - responsible for communicating with the OpenWeather API to get weather data
 class WeatherService {
-  // 单例模式
+  // Singleton pattern
   static final WeatherService _instance = WeatherService._internal();
   factory WeatherService() => _instance;
   WeatherService._internal();
   
-  // OpenWeather API密钥 - 这里需要替换为您的实际API密钥
+  // OpenWeather API key - replace with your actual API key
   final String _apiKey = '9a5b95af3b09cae239fea38a996a8094';
   
-  // API基础URL
+  // API base URL
   final String _baseUrl = 'https://api.openweathermap.org/data/2.5';
   final String _geoUrl = 'http://api.openweathermap.org/geo/1.0';
   
-  /// 根据经纬度获取天气数据
+  /// Get weather data based on latitude and longitude
   Future<WeatherData?> getWeatherByLocation(double latitude, double longitude) async {
     try {
-      // 构建API请求URL - 使用metric单位制（摄氏度）
+      // Build API request URL - using metric units (Celsius)
       final url = '$_baseUrl/weather?lat=$latitude&lon=$longitude&units=metric&appid=$_apiKey';
       
-      developer.log('获取天气数据: $url', name: 'WeatherService');
+      developer.log('Getting weather data: $url', name: 'WeatherService');
       
-      // 发送请求并等待响应
+      // Send request and wait for response
       final response = await http.get(Uri.parse(url));
       
-      // 检查响应状态
+      // Check response status
       if (response.statusCode == 200) {
-        // 解析JSON响应
+        // Parse JSON response
         final data = json.decode(response.body);
         final locationData = await getLocationInfo(latitude, longitude);
         
         return WeatherData.fromJson(data, locationData);
       } else {
-        // 处理错误响应
+        // Handle error response
         developer.log(
-          'OpenWeather API 错误: ${response.statusCode}',
+          'OpenWeather API error: ${response.statusCode}',
           name: 'WeatherService',
           error: response.body
         );
         return null;
       }
     } catch (e) {
-      // 捕获并记录任何异常
+      // Catch and log any exception
       developer.log(
-        '获取天气数据出错',
+        'Error getting weather data',
         name: 'WeatherService',
         error: e.toString()
       );
@@ -57,7 +57,7 @@ class WeatherService {
     }
   }
   
-  /// 获取指定坐标的地理位置信息 (反向地理编码)
+  /// Get location information for specified coordinates (reverse geocoding)
   Future<LocationData?> getLocationInfo(double latitude, double longitude) async {
     try {
       // OpenWeather Geocoding API
@@ -65,30 +65,30 @@ class WeatherService {
       
       developer.log('获取位置信息: $url', name: 'WeatherService');
       
-      // 发送请求并等待响应
+      // Send request and wait for response
       final response = await http.get(Uri.parse(url));
       
-      // 检查响应状态
+      // Check response status
       if (response.statusCode == 200) {
-        // 解析JSON响应
+        // Parse JSON response
         final List<dynamic> data = json.decode(response.body);
         if (data.isNotEmpty) {
           return LocationData.fromJson(data[0]);
         }
         return null;
       } else {
-        // 处理错误响应
+        // Handle error response
         developer.log(
-          'OpenWeather Geocoding API 错误: ${response.statusCode}',
+          'OpenWeather Geocoding API error: ${response.statusCode}',
           name: 'WeatherService',
           error: response.body
         );
         return null;
       }
     } catch (e) {
-      // 捕获并记录任何异常
+      // Catch and log any exception
       developer.log(
-        '获取位置信息出错',
+        'Error getting location information',
         name: 'WeatherService',
         error: e.toString()
       );
@@ -96,25 +96,25 @@ class WeatherService {
     }
   }
   
-  /// 获取天气图标URL
+  /// Get weather icon URL
   String getWeatherIconUrl(String iconCode) {
     return 'https://openweathermap.org/img/wn/$iconCode@2x.png';
   }
   
-  /// 根据经纬度获取5天天气预报
+  /// Get 5-day weather forecast based on latitude and longitude
   Future<List<ForecastData>?> getForecastByLocation(double latitude, double longitude) async {
     try {
-      // 构建API请求URL
+      // Build API request URL
       final url = '$_baseUrl/forecast?lat=$latitude&lon=$longitude&units=metric&appid=$_apiKey';
       
-      developer.log('获取天气预报: $url', name: 'WeatherService');
+      developer.log('Getting weather forecast: $url', name: 'WeatherService');
       
-      // 发送请求并等待响应
+      // Send request and wait for response
       final response = await http.get(Uri.parse(url));
       
-      // 检查响应状态
+      // Check response status
       if (response.statusCode == 200) {
-        // 解析JSON响应
+        // Parse JSON response
         final data = json.decode(response.body);
         
         if (data['list'] != null && data['list'] is List) {
@@ -124,18 +124,18 @@ class WeatherService {
         
         return [];
       } else {
-        // 处理错误响应
+        // Handle error response
         developer.log(
-          'OpenWeather Forecast API 错误: ${response.statusCode}',
+          'OpenWeather Forecast API error: ${response.statusCode}',
           name: 'WeatherService',
           error: response.body
         );
         return null;
       }
     } catch (e) {
-      // 捕获并记录任何异常
+      // Catch and log any exception
       developer.log(
-        '获取天气预报出错',
+        'Error getting weather forecast',
         name: 'WeatherService',
         error: e.toString()
       );
@@ -144,30 +144,30 @@ class WeatherService {
   }
 }
 
-/// 天气数据模型
+/// Weather data model
 class WeatherData {
-  final String cityName;       // 城市名称
-  final String countryCode;    // 国家代码
-  final double temperature;    // 温度 (摄氏度)
-  final double feelsLike;      // 体感温度
-  final double tempMin;        // 最低温度
-  final double tempMax;        // 最高温度
-  final int humidity;          // 湿度 (%)
-  final double windSpeed;      // 风速 (米/秒)
-  final int windDegree;        // 风向 (度)
-  final double? windGust;      // 阵风速度 (米/秒，可能为空)
-  final int pressure;          // 气压 (百帕)
-  final String weatherMain;    // 天气主要状况 (例如: Rain, Snow, Clear)
-  final String weatherDescription; // 天气详细描述
-  final String weatherIcon;    // 天气图标代码
-  final int cloudsPercent;     // 云量 (%)
-  final int visibility;        // 能见度 (米)
-  final DateTime sunrise;      // 日出时间
-  final DateTime sunset;       // 日落时间
-  final DateTime timestamp;    // 数据获取时间戳
-  final int timezone;          // 时区偏移 (秒)
+  final String cityName;       // City name
+  final String countryCode;    // Country code
+  final double temperature;    // Temperature (Celsius)
+  final double feelsLike;      // Feels like temperature
+  final double tempMin;        // Minimum temperature
+  final double tempMax;        // Maximum temperature
+  final int humidity;          // Humidity (%)
+  final double windSpeed;      // Wind speed (m/s)
+  final int windDegree;        // Wind direction (degrees)
+  final double? windGust;      // Wind gust speed (m/s, may be null)
+  final int pressure;          // Pressure (hPa)
+  final String weatherMain;    // Weather main condition (e.g. Rain, Snow, Clear)
+  final String weatherDescription; // Weather detailed description
+  final String weatherIcon;    // Weather icon code
+  final int cloudsPercent;     // Cloud cover (%)
+  final int visibility;        // Visibility (meters)
+  final DateTime sunrise;      // Sunrise time
+  final DateTime sunset;       // Sunset time
+  final DateTime timestamp;    // Data retrieval timestamp
+  final int timezone;          // Timezone offset (seconds)
   
-  // 位置信息
+  // Location information
   final LocationData? location;
   
   WeatherData({
@@ -194,7 +194,7 @@ class WeatherData {
     this.location,
   });
   
-  /// 从OpenWeather API JSON响应创建WeatherData对象
+  /// Create WeatherData object from OpenWeather API JSON response
   factory WeatherData.fromJson(Map<String, dynamic> json, [LocationData? locationData]) {
     final weather = json['weather'][0];
     final main = json['main'];
@@ -227,7 +227,7 @@ class WeatherData {
     );
   }
   
-  /// 获取天气时段 (早晨、中午、傍晚、夜晚)
+  /// Get weather period (morning, midday, evening, night)
   String getDayPeriod() {
     final hour = DateTime.now().hour;
     
@@ -242,12 +242,12 @@ class WeatherData {
     }
   }
   
-  /// 获取天气状况描述 (用于UI显示)
+  /// Get weather condition description (for UI display)
   String getWeatherCondition() {
     return weatherDescription;
   }
   
-  /// 将温度映射到情感描述
+  /// Map temperature to emotional description
   List<String> getTemperatureMood() {
     if (temperature >= 30) {
       return ['hot', 'energetic'];
@@ -262,7 +262,7 @@ class WeatherData {
     }
   }
   
-  /// 将天气状况映射到情感描述
+  /// Map weather condition to emotional description
   List<String> getWeatherMood() {
     final condition = weatherMain.toLowerCase();
     
@@ -283,7 +283,7 @@ class WeatherData {
     }
   }
   
-  /// 构建音乐生成用的Prompt
+  /// Build music generation prompt
   String buildMusicPrompt() {
     final dayPeriod = getDayPeriod();
     final temperatureMoods = getTemperatureMood();
@@ -297,19 +297,19 @@ The mood is ${temperatureMoods[0]} and ${weatherMoods[0]}.
 ''';
   }
   
-  /// 获取天气图标URL
+  /// Get weather icon URL
   String getIconUrl() {
     return 'https://openweathermap.org/img/wn/$weatherIcon@2x.png';
   }
 }
 
-/// 天气预报数据模型
+/// Forecast data model
 class ForecastData {
-  final DateTime timestamp;    // 预报时间
-  final double temperature;    // 温度 (摄氏度)
-  final double feelsLike;      // 体感温度
-  final double tempMin;        // 最低温度
-  final double tempMax;        // 最高温度
+  final DateTime timestamp;    // Forecast time
+  final double temperature;    // Temperature (Celsius)
+  final double feelsLike;      // Feels like temperature
+  final double tempMin;        // Minimum temperature
+  final double tempMax;        // Maximum temperature
   final int humidity;          // 湿度 (%)
   final double windSpeed;      // 风速 (米/秒)
   final int windDegree;        // 风向 (度)
@@ -373,14 +373,14 @@ class ForecastData {
   }
 }
 
-/// 位置数据模型 (用于反向地理编码)
+/// Location data model (for reverse geocoding)
 class LocationData {
-  final String name;           // 城市名称
-  final String country;        // 国家代码
-  final String state;          // 州/省
-  final Map<String, String>? localNames; // 不同语言的名称
-  final double latitude;       // 纬度
-  final double longitude;      // 经度
+  final String name;           // City name
+  final String country;        // Country code
+  final String state;          // State/province
+  final Map<String, String>? localNames; // Names in different languages
+  final double latitude;       // Latitude
+  final double longitude;      // Longitude
   
   LocationData({
     required this.name,
@@ -391,9 +391,9 @@ class LocationData {
     required this.longitude,
   });
   
-  /// 从OpenWeather Geocoding API响应创建LocationData对象
+  /// Create LocationData object from OpenWeather Geocoding API response
   factory LocationData.fromJson(Map<String, dynamic> json) {
-    // 处理localNames字段，将其转换为Map<String, String>
+    // Process localNames field, convert it to Map<String, String>
     Map<String, String>? localNames;
     if (json['local_names'] != null) {
       localNames = {};
@@ -414,7 +414,7 @@ class LocationData {
     );
   }
   
-  /// 获取格式化的位置字符串
+  /// Get formatted location string
   String getFormattedLocation() {
     if (state.isNotEmpty) {
       return '$name, $state';
@@ -422,17 +422,17 @@ class LocationData {
     return '$name, $country';
   }
   
-  /// 获取指定语言的地名 (如果有)
+  /// Get local name in specified language (if available)
   String? getLocalName(String languageCode) {
     return localNames?[languageCode];
   }
   
-  /// 获取中文地名 (如果有)
+  /// Get Chinese name (if available)
   String? getChineseName() {
     return getLocalName('zh');
   }
   
-  /// 转换为LatLng对象 (用于地图)
+  /// Convert to LatLng object (for map)
   LatLng toLatLng() {
     return LatLng(latitude, longitude);
   }
