@@ -6,9 +6,9 @@ import 'package:latlong2/latlong.dart';
 import 'package:location/location.dart';
 import 'dart:developer' as developer;
 import 'package:flutter/foundation.dart';
-import '../screens/home_screen.dart'; // 导入 FlagInfo 类
+import '../screens/home_screen.dart'; //Import FlagInfo class
 
-// 将 typedef 定义移动到类外部
+// Move to class external 
 typedef ZoomChangedCallback = void Function(double zoom);
 
 // Flutter Map Map Service
@@ -40,43 +40,43 @@ class FlutterMapService extends ChangeNotifier {
   // Add constant at the top of the class
   static const double COUNTRY_ZOOM_LEVEL = 6.0; // Country zoom level
   
-  // 添加缩放比例相关属性
+  // Add zoom scale related properties
   double _currentZoom = COUNTRY_ZOOM_LEVEL;
   double get currentZoom => _currentZoom;
   
-  // 标记尺寸比例参考值
-  static const double BASE_ZOOM = 10.0; // 基准缩放级别
-  static const double BASE_MARKER_SIZE = 30.0; // 基准标记大小
+  // Marker size reference value
+  static const double BASE_ZOOM = 10.0; // Base zoom level
+  static const double BASE_MARKER_SIZE = 30.0; // Base marker size
   
-  // 缩放变化回调
+  // Zoom change callback
   ZoomChangedCallback? _onZoomChanged;
   
-  // 设置缩放变化回调
+  // Set zoom change callback
   void setZoomChangedCallback(ZoomChangedCallback callback) {
     _onZoomChanged = callback;
   }
   
-  // 根据缩放级别计算标记大小
+  // Calculate marker size based on zoom level
   double calculateMarkerSize(double baseSize) {
-    // 缩放系数：缩放级别越大，标记越小；缩放级别越小，标记越大
+    // Zoom factor: the larger the zoom level, the smaller the marker; the smaller the zoom level, the larger the marker
     double zoomFactor = math.pow(0.85, _currentZoom - BASE_ZOOM).toDouble();
-    // 限制最小/最大大小
+    // Limit minimum/maximum size
     return math.max(15.0, math.min(baseSize * zoomFactor, 50.0));
   }
   
-  // 更新当前缩放级别
+  // Update current zoom level
   void updateZoom(double zoom) {
     _currentZoom = zoom;
-    // 通知监听器缩放变化
+    // Notify listener of zoom change
     if (_onZoomChanged != null) {
       _onZoomChanged!(_currentZoom);
     }
   }
   
-  // 添加一个属性来控制是否自动移动到当前位置
+  // Add a property to control whether to automatically move to the current location
   bool _autoMoveToCurrentLocation = false;
   
-  // 修改 initMap 方法，添加一个参数来控制是否自动移动
+  // Modify initMap method, add a parameter to control whether to automatically move
   void initMap(MapController controller, {bool autoMoveToCurrentLocation = false}) {
     _mapController = controller;
     _autoMoveToCurrentLocation = autoMoveToCurrentLocation;
@@ -112,7 +112,7 @@ class FlutterMapService extends ChangeNotifier {
       // Get current location
       await getCurrentLocation();
       
-      // 只有当 _autoMoveToCurrentLocation 为 true 时才自动移动
+      // Only move when _autoMoveToCurrentLocation is true
       if (_autoMoveToCurrentLocation && _mapController != null) {
         await moveToCurrentLocation();
       }
@@ -127,7 +127,7 @@ class FlutterMapService extends ChangeNotifier {
   // Get current location
   Future<void> getCurrentLocation() async {
     try {
-      // 确保超时情况下也设置合理的默认值
+      // Ensure a reasonable default value is set even if there is a timeout
       final locationData = await _locationService.getLocation()
           .timeout(const Duration(seconds: 5), onTimeout: () {
         print("DEBUG: Get location timeout");
@@ -148,7 +148,7 @@ class FlutterMapService extends ChangeNotifier {
       developer.log('Current location: ${locationData.latitude}, ${locationData.longitude}', 
                   name: 'FlutterMapService');
     } catch (e) {
-      // 确保任何错误情况下也设置默认值
+      // Ensure a default value is set even if there is an error
       _currentLocation = LocationData.fromMap({
         'latitude': _defaultLocation.latitude,
         'longitude': _defaultLocation.longitude,
@@ -163,29 +163,29 @@ class FlutterMapService extends ChangeNotifier {
     }
   }
   
-  // 移动到当前位置
+  // Move to current location
   Future<void> moveToCurrentLocation() async {
     try {
       await getCurrentLocation();
       
       if (_mapController == null) {
-        print("地图控制器未初始化");
+        print("Map controller not initialized");
         return;
       }
       
-      // 直接尝试使用控制器，不检查 state 属性
+      // Try to use the controller directly, without checking the state property
       try {
-        // 如果控制器未就绪，这里会抛出异常，会被下面的 catch 捕获
+        // If the controller is not ready, this will throw an exception, which will be caught below
         _mapController!.move(
           LatLng(_currentLocation!.latitude!, _currentLocation!.longitude!),
           COUNTRY_ZOOM_LEVEL
         );
-        print("成功移动地图到当前位置");
+        print("Successfully moved map to current location");
       } catch (e) {
-        print("移动地图失败: $e");
+        print("Failed to move map: $e");
       }
     } catch (e) {
-      print("移动到当前位置时出错: $e");
+      print("Error moving to current location: $e");
     }
   }
   
@@ -199,21 +199,21 @@ class FlutterMapService extends ChangeNotifier {
     VoidCallback? onLongPress,
     Widget? icon,
   }) {
-    print('添加标记 - ID: $id, 位置: ${position.latitude}, ${position.longitude}');
-    print('点击事件是否设置: ${onTap != null}');
+    print('Add marker - ID: $id, position: ${position.latitude}, ${position.longitude}');
+    print('Click event set: ${onTap != null}');
     
-    // 移除同ID的标记
+    // Remove markers with the same ID
     _markers.removeWhere((marker) => marker.key.toString().contains(id));
     
-    // 添加新标记
+    // Add new marker
     final marker = Marker(
       point: position,
-      width: 40, // 确保足够大的点击区域
-      height: 40, // 确保足够大的点击区域
+      width: 40, // Ensure a large enough click area
+      height: 40, // Ensure a large enough click area
       builder: (context) {
         return GestureDetector(
           onTap: () {
-            print('标记被点击: $id');
+            print('Marker clicked: $id');
             if (onTap != null) onTap();
           },
           onLongPress: onLongPress,
@@ -238,7 +238,7 @@ class FlutterMapService extends ChangeNotifier {
     
     _markers.add(marker);
     
-    // 确保通知监听器，这样标记会显示在地图上
+    // Ensure notification listener, so the marker will be displayed on the map
     notifyListeners();
   }
   
@@ -283,22 +283,22 @@ class FlutterMapService extends ChangeNotifier {
   
   // Remove marker
   void removeMarker(String id) {
-    print('开始删除标记: $id，当前标记数量: ${_markers.length}');
+    print('Start deleting marker: $id, current marker count: ${_markers.length}');
     
-    // 打印所有标记的ID以进行调试
-    print('所有标记的ID: ${_markers.map((m) => m.key.toString()).join(", ")}');
+    // Print all marker IDs for debugging
+    print('All marker IDs: ${_markers.map((m) => m.key.toString()).join(", ")}');
     
-    // 尝试多种匹配方式
+    // Try multiple matching methods
     int removedCount = 0;
     
-    // 1. 使用精确匹配
+    // 1. Use exact matching
     _markers.removeWhere((marker) {
       bool shouldRemove = marker.key.toString() == 'Key("$id")';
       if (shouldRemove) removedCount++;
       return shouldRemove;
     });
     
-    // 2. 如果精确匹配没有删除任何标记，尝试包含匹配
+    // 2. If exact matching does not delete any markers, try containing matching
     if (removedCount == 0) {
       _markers.removeWhere((marker) {
         bool shouldRemove = marker.key.toString().contains(id);
@@ -307,9 +307,9 @@ class FlutterMapService extends ChangeNotifier {
       });
     }
     
-    print('总共删除了 $removedCount 个标记，剩余 ${_markers.length} 个');
+    print('Total deleted $removedCount markers, remaining ${_markers.length}');
     
-    // 确保通知界面刷新
+    // Ensure notification listener, so the marker will be displayed on the map
     notifyListeners();
   }
   
@@ -334,33 +334,33 @@ class FlutterMapService extends ChangeNotifier {
     // Flutter Map has no resources to dispose
   }
   
-  // 新增方法：清除所有天气标记
+  // Add new method: clear all weather markers
   void clearAllWeatherMarkers() {
     _markers.removeWhere((marker) => marker.key.toString().contains('weather_'));
   }
   
-  // 添加新方法：更新标记的点击事件
+  // Add new method: update marker click event
   void updateMarkerTapEvent(String id, VoidCallback? onTap) {
-    // 找到匹配ID的标记
+    // Find the marker with the matching ID
     int index = _markers.indexWhere((marker) => marker.key.toString().contains(id));
     
     if (index != -1) {
-      // 获取原始标记
+      // Get the original marker
       Marker oldMarker = _markers[index];
       
-      // 创建一个新标记，复制除点击事件外的所有属性
+      // Create a new marker, copy all properties except the click event
       Marker newMarker = Marker(
         key: oldMarker.key,
         point: oldMarker.point,
         width: oldMarker.width,
         height: oldMarker.height,
         builder: (context) {
-          // 假设原始builder创建了一个GestureDetector
-          // 这里我们需要包装原始widget以更新其onTap属性
-          // 注意：这是一个简化示例，实际实现可能更复杂
+          // Assume the original builder created a GestureDetector
+          // Here we need to wrap the original widget to update its onTap property
+          // Note: This is a simplified example, the actual implementation may be more complex
           Widget originalWidget = oldMarker.builder(context);
           
-          // 如果原始widget是GestureDetector，我们可以尝试复制并修改它
+          // If the original widget is a GestureDetector, we can try to copy and modify it
           if (originalWidget is GestureDetector) {
             return GestureDetector(
               onTap: onTap,
@@ -369,57 +369,57 @@ class FlutterMapService extends ChangeNotifier {
             );
           }
           
-          // 否则，返回原始widget（不更新点击事件）
+          // Otherwise, return the original widget (do not update the click event)
           return originalWidget;
         },
       );
       
-      // 用新标记替换旧标记
+      // Replace the old marker with the new marker
       _markers[index] = newMarker;
     }
   }
   
-  // 添加 notifyListeners 方法，如果不是 ChangeNotifier 的子类
+  // Add notifyListeners method, if not a subclass of ChangeNotifier
   void notifyListeners() {
-    // 重新构建依赖该服务的 Widget
+    // Rebuild the dependent Widget
     super.notifyListeners();
   }
   
   // 在 FlutterMapService 类中添加这个方法
   void clearAndRebuildMarkers(String excludeId) {
-    // 保存所有不含指定ID的标记
+    // Save all markers except the specified ID
     final markersToKeep = _markers.where((marker) => !marker.key.toString().contains(excludeId)).toList();
     
-    // 清空标记列表
+    // Clear the marker list
     _markers.clear();
     
-    // 重新添加保留的标记
+    // Add the retained markers
     _markers.addAll(markersToKeep);
     
-    // 通知监听器
+    // Notify listener
     notifyListeners();
   }
   
-  // 添加红旗信息持久化映射
+  // Add persistent flag information mapping
   final Map<String, FlagInfo> _persistentFlagMap = {};
-  // 红旗信息持久化映射的getter
+  // Getter for persistent flag information mapping
   Map<String, FlagInfo> get persistentFlagMap => _persistentFlagMap;
   
-  // 保存红旗信息
+  // Save flag information
   void saveFlagInfo(String flagId, FlagInfo flagInfo) {
     _persistentFlagMap[flagId] = flagInfo;
-    // 通知监听器更新
+    // Notify listener to update
     notifyListeners();
   }
   
-  // 移除红旗信息
+  // Remove flag information
   void removeFlagInfo(String flagId) {
-    print('移除红旗信息: $flagId');
-    // 从持久化映射中移除
+    print('Remove flag information: $flagId');
+    // Remove from persistent mapping
     _persistentFlagMap.remove(flagId);
-    // 同时移除相应的标记
+    // Also remove the corresponding marker
     removeMarker(flagId);
-    // 通知监听器更新
+    // Notify listener to update
     notifyListeners();
   }
 }

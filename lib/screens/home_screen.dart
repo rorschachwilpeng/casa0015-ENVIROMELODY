@@ -4,14 +4,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import '../services/flutter_map_service.dart';
-import '../models/weather_service.dart'; // 引入天气服务
+import '../models/weather_service.dart'; // Import weather service
 
-// 定义 FlagInfo 类（放在文件顶部，所有类外部）
+// Define FlagInfo class (put at the top of the file, all classes outside)
 class FlagInfo {
   final LatLng position;
   final WeatherData? weatherData;
   final DateTime createdAt;
-  final String? musicTitle; // 如果生成了音乐，存储音乐标题
+  final String? musicTitle; // If music is generated, store the music title
   
   FlagInfo({
     required this.position,
@@ -21,7 +21,7 @@ class FlagInfo {
   });
 }
 
-// 在文件顶部定义一个类来管理地图状态
+// Define a class to manage map state at the top of the file
 class MapState {
   LatLng center;
   double zoom;
@@ -44,7 +44,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   // Flutter Map Service
   final FlutterMapService _mapService = FlutterMapService();
   
-  // 天气服务
+  // Weather service
   final WeatherService _weatherService = WeatherService();
   
   // Map Controller
@@ -53,56 +53,56 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   // State Variables
   bool _isMapReady = false;
   bool _isLoadingLocation = false;
-  bool _isLoadingWeather = false; // 新增：天气数据加载状态
-  bool _isPlacingFlag = false; // 是否正在放置红旗
+  bool _isLoadingWeather = false; // New: weather data loading status
+  bool _isPlacingFlag = false; // Whether placing a flag
   
   // Music Markers List
   final List<String> _musicMarkers = [];
   
-  // 选中的位置和天气数据
+  // Selected location and weather data
   LatLng? _selectedLocation;
   WeatherData? _weatherData;
   
   // Define a constant for the country zoom level
   static const double COUNTRY_ZOOM_LEVEL = 6.0; // Country zoom level
   
-  // 跟踪上次点击的时间和位置
+  // Track the time and position of the last tap
   DateTime? _lastTapTime;
   LatLng? _lastTapPosition;
-  static const _doubleTapThreshold = Duration(milliseconds: 300); // 双击阈值
+  static const _doubleTapThreshold = Duration(milliseconds: 300); // Double tap threshold
   
-  // 在_HomeScreenState类中添加
+  // Add in _HomeScreenState class
   final List<String> _weatherMarkerIds = [];
   
-  // FlagInfo 存储映射 - 保留，但删除类定义
+  // FlagInfo storage mapping
   final Map<String, FlagInfo> _flagInfoMap = {};
   
-  // 添加一个静态变量，用于控制是否是首次加载
+  // Add a static variable, used to control whether it is the first load
   static bool _isFirstLoad = true;
   
-  // 在 _HomeScreenState 类中添加这些变量
+  // Add these variables in _HomeScreenState class
   LatLng? _mapCenterPosition;
   double? _mapZoomLevel = COUNTRY_ZOOM_LEVEL;
   
-  // 使用这个状态对象
+  // Use this status object
   late MapState _mapState;
   
-  // 在类中添加
-  LatLng _currentCenter = LatLng(51.5074, -0.1278); // 伦敦默认位置
+  // Add in the class
+  LatLng _currentCenter = LatLng(51.5074, -0.1278); // London default position
   double _currentZoom = 6.0;
   
-  // 在 _HomeScreenState 类中添加这些变量，用于保存上一次的地图状态
-  LatLng _lastMapCenter = LatLng(51.5074, -0.1278); // 伦敦默认位置
-  double _lastMapZoom = 6.0; // 默认缩放级别
-  bool _hasInitializedOnce = false; // 用于跟踪是否已经初始化过
+  // Add these variables in _HomeScreenState class, used to save the last map state
+  LatLng _lastMapCenter = LatLng(51.5074, -0.1278); // London default position
+  double _lastMapZoom = 6.0; // Default zoom level
+  bool _hasInitializedOnce = false; // Used to track whether it has been initialized
   
   @override
   void initState() {
     super.initState();
-    // 添加页面生命周期观察者
+    // Add page lifecycle observer
     WidgetsBinding.instance.addObserver(this);
     
-    // 初始化地图状态
+    // Initialize map state
     _mapState = MapState(
       center: _mapService.getDefaultLocation(),
       zoom: COUNTRY_ZOOM_LEVEL,
@@ -110,27 +110,27 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     
     _initMapService();
     
-    // 异步初始化
+    // Asynchronous initialization
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initLocationService();
       _loadPersistentFlags();
     });
     
-    // 监听地图缩放和移动事件
+    // Listen to map zoom and move events
     _mapController.mapEventStream.listen((event) {
       if (event is MapEventMove) {
-        // 更新缩放级别
+        // Update zoom level
         _mapService.updateZoom(event.zoom);
-        // 更新我们自己的状态变量
+        // Update our own status variables
         _updateMapState();
       }
     });
     
-    // 设置缩放变化回调，在缩放变化时触发界面重绘
+    // Set zoom change callback, trigger interface redraw when zoom changes
     _mapService.setZoomChangedCallback((zoom) {
       if (mounted) {
         setState(() {
-          // 空的setState，仅用于触发界面重绘，使所有标记根据新的缩放级别更新大小
+          // Empty setState, only used to trigger interface redraw, so all markers update size according to the new zoom level
         });
       }
     });
@@ -139,51 +139,51 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // 可以在这里重新检查状态并初始化
+    // You can check the status here and initialize
     if (!_isMapReady && _mapController != null) {
       _onMapReady();
     }
   }
   
-  // 监听页面状态变化
+  // Listen to page status changes
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      // 当应用从后台恢复时
+      // When the application resumes from the background
       if (_hasInitializedOnce) {
-        // 如果之前已经初始化过，仅重新创建控制器但不移动到当前位置
+        // If it has been initialized before, only recreate the controller but do not move to the current location
         _mapController = MapController();
         _initMapService();
         
-        // 在下一帧绘制完成后，恢复到上一次的地图位置和缩放级别
+        // After the next frame is drawn, restore the map position and zoom level
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (_isMapReady) {
             try {
               _mapController.move(_lastMapCenter, _lastMapZoom);
             } catch (e) {
-              print('恢复地图位置时出错: $e');
+              print('Error restoring map position: $e');
             }
           }
         });
       } else {
-        // 如果是第一次初始化，允许定位到当前位置
+        // If it is the first initialization, allow to locate to the current location
         _mapController = MapController();
         _initMapService();
         _hasInitializedOnce = true;
       }
     } else if (state == AppLifecycleState.paused) {
-      // 当应用进入后台时，保存当前地图状态
+      // When the application enters the background, save the current map state
       try {
         _lastMapCenter = _mapController.center;
         _lastMapZoom = _mapController.zoom;
       } catch (e) {
-        print('保存地图位置时出错: $e');
+        print('Error saving map position: $e');
       }
     }
   }
   
   void _initMapService() {
-    // 只有在第一次初始化时才自动移动到当前位置
+    // Only move to the current location when it is the first initialization
     _mapService.initMap(_mapController, autoMoveToCurrentLocation: !_hasInitializedOnce);
   }
   
@@ -211,7 +211,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   
   @override
   void dispose() {
-    // 添加这行代码，确保在销毁时清除所有标记
+    // Add this line of code to ensure that all markers are cleared when destroyed
     _mapService.clearMarkers();
     WidgetsBinding.instance.removeObserver(this);
     _mapService.dispose();
@@ -226,17 +226,17 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       _isMapReady = true;
     });
     
-    // 仅在首次加载并且 _hasInitializedOnce 为 false 时自动定位
+    // Only move to the current location when it is the first load and _hasInitializedOnce is false
     if (_isFirstLoad && !_hasInitializedOnce) {
       _goToCurrentLocation();
       _isFirstLoad = false;
       _hasInitializedOnce = true;
     } else {
-      // 如果不是首次加载，恢复到上一次保存的位置
+      // If it is not the first load, restore to the last saved position
       try {
         _mapController.move(_lastMapCenter, _lastMapZoom);
       } catch (e) {
-        print('恢复地图位置时出错: $e');
+        print('Error restoring map position: $e');
       }
     }
   }
@@ -268,7 +268,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
   }
   
-  // 获取点击位置的天气数据
+  // Get weather data for the clicked location
   Future<void> _getWeatherForLocation(LatLng location, String flagId) async {
     if (!_isMapReady) return;
     
@@ -278,7 +278,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     });
     
     try {
-      // 获取天气数据
+      // Get weather data
       final weatherData = await _weatherService.getWeatherByLocation(
         location.latitude, 
         location.longitude
@@ -288,17 +288,17 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         setState(() {
           _weatherData = weatherData;
           
-          // 创建红旗信息
+          // Create flag information
           FlagInfo flagInfo = FlagInfo(
             position: location,
             weatherData: weatherData,
             createdAt: DateTime.now(),
           );
           
-          // 保存到本地状态
+          // Save to local status
           _flagInfoMap[flagId] = flagInfo;
           
-          // 同时保存到持久服务中
+          // Save to persistent service
           if (flagId.isNotEmpty) {
             _mapService.saveFlagInfo(flagId, flagInfo);
           }
@@ -321,25 +321,25 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
   }
 
-  // 修改 _updateFlagMarkerTapEvent 方法
+  // Modify _updateFlagMarkerTapEvent method
   void _updateFlagMarkerTapEvent(String flagId, WeatherData weatherData) {
-    // 这个方法需要修改 FlutterMapService 来支持
-    // 如果 FlutterMapService 不支持更新已有标记的事件
-    // 可以考虑移除并重新添加标记
+    // This method needs to be modified to support FlutterMapService
+    // If FlutterMapService does not support updating the event of existing markers
+    // You can consider removing and adding the marker again
     
-    // 从 LocationData 转换为 LatLng
+    // Convert LocationData to LatLng
     LatLng latLng = LatLng(
-      weatherData.location!.latitude,  // 根据实际 LocationData 结构调整
-      weatherData.location!.longitude  // 根据实际 LocationData 结构调整
+      weatherData.location!.latitude,  // Adjust according to the actual LocationData structure
+      weatherData.location!.longitude  // Adjust according to the actual LocationData structure
     );
     
-    // 尝试多种匹配方式
+    // Try multiple matching methods
     int removedCount = 0;
     
-    // 1. 使用精确匹配
+    // 1. Use exact matching
     _mapService.removeMarker(flagId);
     
-    // 2. 如果精确匹配没有删除任何标记，尝试包含匹配
+    // 2. If exact matching does not delete any markers, try containing matching
     if (removedCount == 0) {
       _mapService.addMarker(
         id: flagId,
@@ -356,18 +356,18 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
   }
 
-  // 双击地图事件处理
+  // Handle double-tap map events
   void _handleMapDoubleTap(TapPosition tapPosition, LatLng location) {
     print('Double tapped at: ${location.latitude}, ${location.longitude}');
     
-    // 获取该位置的天气数据
+    // Get weather data for the clicked location
     _getWeatherForLocation(location, '');
     
-    // 移动到该位置并稍微放大
+    // Move to the location and slightly zoom in
     _mapController.move(location, _mapController.zoom + 1);
   }
   
-  // 构建天气标记图标
+  // Build weather marker icon
   Widget _buildWeatherMarkerIcon() {
     return Container(
       padding: const EdgeInsets.all(2),
@@ -390,7 +390,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     );
   }
   
-  // 根据天气状况获取图标
+  // Get weather icon based on weather condition
   IconData _getWeatherIcon() {
     if (_weatherData == null) return Icons.cloud;
     
@@ -413,7 +413,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
   }
   
-  // 根据天气状况获取颜色
+  // Get weather color based on weather condition
   Color _getWeatherColor() {
     if (_weatherData == null) return Colors.grey;
     
@@ -436,65 +436,65 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
   }
   
-  // 修改地图点击事件处理方法
+  // Modify map click event processing method
   void _handleMapTap(TapPosition tapPosition, LatLng location) {
-    _saveCurrentMapState(); // 保存当前地图状态
+    _saveCurrentMapState(); // Save current map state
     
-    print('地图被点击，放置红旗模式: $_isPlacingFlag');
+    print('Map clicked, placing flag mode: $_isPlacingFlag');
     
     if (_isPlacingFlag) {
-      // 在点击位置放置红旗
+      // Place flag at the clicked location
       _placeFlagAndGetWeather(location);
       
-      // 重置标记状态
+      // Reset marker status
       setState(() {
         _isPlacingFlag = false;
       });
       
     } else {
-      // 当不在放置红旗模式时，检查是否点击了附近的红旗
+      // When not in flag placement mode, check if a nearby flag was clicked
       _checkFlagNearby(location);
     }
   }
   
-  // 检查点击位置附近是否有红旗
+  // Check if there is a nearby flag
   void _checkFlagNearby(LatLng tapLocation) {
-    // 遍历所有红旗信息
+    // Iterate through all flag information
     String? nearestFlagId;
     double minDistance = double.infinity;
-    final double threshold = 0.005; // 约500米左右的阈值
+    final double threshold = 0.005; // Threshold of about 500 meters
     
     _flagInfoMap.forEach((flagId, flagInfo) {
       final LatLng flagPos = flagInfo.position;
       
-      // 计算距离（简单欧几里得距离）
+      // Calculate distance (simple Euclidean distance)
       final double dist = sqrt(
         pow(tapLocation.latitude - flagPos.latitude, 2) + 
         pow(tapLocation.longitude - flagPos.longitude, 2)
       );
       
-      // 如果在阈值内且是最近的，记录这个旗帜
+      // If within the threshold and is the nearest, record this flag
       if (dist < threshold && dist < minDistance) {
         minDistance = dist;
         nearestFlagId = flagId;
       }
     });
     
-    // 如果找到最近的红旗，显示其信息
+    // If a nearby flag is found, display its information
     if (nearestFlagId != null) {
       final flagInfo = _flagInfoMap[nearestFlagId]!;
       _showFlagInfoWindow(nearestFlagId!, flagInfo.position);
     }
   }
   
-  // 修改放置红旗方法
+  // Modify the place flag method
   void _placeFlagAndGetWeather(LatLng location) {
-    print('放置红旗于: ${location.latitude}, ${location.longitude}');
+    print('Place flag at: ${location.latitude}, ${location.longitude}');
     
-    // 生成唯一的红旗ID
+    // Generate a unique flag ID
     String flagId = 'flag_${DateTime.now().millisecondsSinceEpoch}';
     
-    // 添加红旗标记
+    // Add flag marker
     _mapService.addMarker(
       id: flagId,
       position: location,
@@ -510,7 +510,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         ),
       ),
       onTap: () {
-        print('红旗被点击: $flagId');
+        print('Flag clicked: $flagId');
         _showFlagInfoWindow(flagId, location);
       },
       onLongPress: () {
@@ -518,39 +518,39 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       },
     );
     
-    // 移动到该位置
+    // Move to the location
     _safelyMoveMap(location, _mapController.zoom);
     
-    // 获取该位置的天气数据
+    // Get weather data for the location
     _getWeatherForLocation(location, flagId);
     
-    // 刷新UI以确保标记显示
+    // Refresh UI to ensure marker is displayed
     setState(() {});
   }
   
-  // 构建红旗标记图标
+  // Build flag marker icon
   Widget _buildFlagMarkerIcon() {
     return Container(
-      // 增加一个透明的点击区域
+      // Add a transparent click area
       width: 40,
       height: 40,
       alignment: Alignment.center,
-      color: Colors.transparent, // 透明背景，增大点击区域
+      color: Colors.transparent, // Transparent background, increase click area
       child: Icon(
         Icons.flag,
         color: Colors.red,
-        size: _mapService.calculateMarkerSize(15.0), // 稍微增大图标
+        size: _mapService.calculateMarkerSize(15.0), // Slightly increase icon size
       ),
     );
   }
   
-  // 添加新方法：显示删除标记对话框
+  // Add new method: display delete marker dialog
   void _showDeleteMarkerDialog(String markerId) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('删除标记'),
-        content: const Text('您确定要删除这个标记吗？'),
+        title: const Text('Delete marker'),
+        content: const Text('Are you sure you want to delete this marker?'),
         actions: [
           TextButton(
             onPressed: () {
@@ -564,14 +564,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               
               _deleteFlag(markerId);
               
-              // 如果删除的是天气标记，也清除天气数据
+              // If the marker to be deleted is a weather marker, also clear weather data
               if (markerId.contains('weather_')) {
                 setState(() {
                   _weatherData = null;
                 });
               }
             },
-            child: const Text('删除', style: TextStyle(color: Colors.red)),
+            child: const Text('Delete', style: TextStyle(color: Colors.red)),
           ),
         ],
       ),
@@ -678,7 +678,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       ),
                     ),
                     SizedBox(width: 8),
-                    Text('获取天气数据...', style: TextStyle(fontSize: 12)),
+                    Text('Getting weather data...', style: TextStyle(fontSize: 12)),
                   ],
                 ),
               ),
@@ -742,7 +742,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   children: [
                     _buildMapButton(
                       icon: _isPlacingFlag ? Icons.cancel : Icons.flag,
-                      label: _isPlacingFlag ? '取消放置' : '放置红旗',
+                      label: _isPlacingFlag ? 'Cancel placement' : 'Place flag',
                       onTap: _toggleFlagPlacementMode,
                     ),
                     _buildMapButton(
@@ -771,7 +771,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     Icon(Icons.flag, color: Colors.white),
                     SizedBox(width: 8),
                     Text(
-                      '点击地图放置红旗',
+                      'Click map to place flag',
                       style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
                     ),
                   ],
@@ -879,19 +879,19 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     children: [
                       _buildWeatherDetailRow(
                         Icons.thermostat_outlined, 
-                        '体感温度', 
+                        'Feels like', 
                         '${weatherData.feelsLike.toStringAsFixed(1)}°C'
                       ),
                       const SizedBox(height: 4),
                       _buildWeatherDetailRow(
                         Icons.water_drop_outlined, 
-                        '湿度', 
+                        'Humidity', 
                         '${weatherData.humidity}%'
                       ),
                       const SizedBox(height: 4),
                       _buildWeatherDetailRow(
                         Icons.air, 
-                        '风速', 
+                        'Wind speed', 
                         '${weatherData.windSpeed} m/s'
                       ),
                     ],
@@ -914,7 +914,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   ),
                 ),
                 icon: const Icon(Icons.music_note),
-                label: const Text('根据天气生成音乐'),
+                label: const Text('Generate music based on weather'),
                 onPressed: () {
                   _showGenerateMusicDialog(weatherData, '');
                 },
@@ -955,13 +955,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('根据天气生成音乐'),
+        title: const Text('Generate music based on weather'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              '将使用以下Prompt生成音乐:',
+              'The music will be generated using the following Prompt:',
               style: TextStyle(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
@@ -976,19 +976,19 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             ),
             const SizedBox(height: 16),
             const Text(
-              '您可以修改此Prompt以满足需求:',
+              'You can modify this Prompt to meet your needs:',
               style: TextStyle(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
             TextField(
               decoration: const InputDecoration(
                 border: OutlineInputBorder(),
-                hintText: '编辑Prompt...',
+                hintText: 'Edit Prompt...',
               ),
               maxLines: 5,
               controller: TextEditingController(text: prompt),
               onChanged: (value) {
-                // 在这里存储修改后的Prompt
+
               },
             ),
           ],
@@ -998,7 +998,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             onPressed: () {
               Navigator.pop(context);
             },
-            child: const Text('取消'),
+            child: const Text('Cancel'),
           ),
           ElevatedButton(
             onPressed: () {
@@ -1006,7 +1006,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               
               _generateMusicAndUpdateFlag(weatherData, flagId);
             },
-            child: const Text('生成音乐'),
+            child: const Text('Generate music'),
           ),
         ],
       ),
@@ -1025,7 +1025,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     Future.delayed(const Duration(seconds: 2), () {
       Navigator.pop(context);
       
-      final musicTitle = '${weatherData.cityName}的${weatherData.weatherDescription}音乐';
+      final musicTitle = '${weatherData.cityName} ${weatherData.weatherDescription} music';
       
       if (_flagInfoMap.containsKey(flagId)) {
         setState(() {
@@ -1044,7 +1044,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       }
       
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('成功生成音乐: $musicTitle')),
+        SnackBar(content: Text('Successfully generated music: $musicTitle')),
       );
     });
   }
@@ -1075,18 +1075,18 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
   
   void _toggleFlagPlacementMode() {
-    print('切换放置红旗模式，当前状态: $_isPlacingFlag');
+    print('Switching to flag placement mode, current state: $_isPlacingFlag');
     
     setState(() {
       _isPlacingFlag = !_isPlacingFlag;
     });
     
-    print('切换后状态: $_isPlacingFlag');
+    print('After switching: $_isPlacingFlag');
     
     if (_isPlacingFlag) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('请在地图上点击一个位置来放置红旗'),
+          content: Text('Click a location on the map to place a flag'),
           duration: Duration(seconds: 3),
         ),
       );
@@ -1143,7 +1143,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('显示${weatherData.cityName}的天气信息'),
+        content: Text('Displaying weather information for ${weatherData.cityName}'),
         duration: const Duration(seconds: 2),
       ),
     );
@@ -1170,7 +1170,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               children: [
                 Icon(Icons.album, color: Colors.purple),
                 SizedBox(width: 10),
-                Text('基于天气生成的音乐'),
+                Text('Music generated based on weather'),
               ],
             ),
             const SizedBox(height: 8),
@@ -1179,7 +1179,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 const Icon(Icons.location_on, size: 16, color: Colors.grey),
                 const SizedBox(width: 10),
                 Text(
-                  '创建于 ${DateTime.now().toString().substring(0, 16)}',
+                  'Created at ${DateTime.now().toString().substring(0, 16)}',
                   style: const TextStyle(fontSize: 12, color: Colors.grey),
                 ),
               ],
@@ -1190,21 +1190,21 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               children: [
                 OutlinedButton.icon(
                   icon: const Icon(Icons.play_arrow),
-                  label: const Text('播放'),
+                  label: const Text('Play'),
                   onPressed: () {
                     Navigator.pop(context);
                     ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('播放音乐: $title')),
+                      SnackBar(content: Text('Playing music: $title')),
                     );
                   },
                 ),
                 OutlinedButton.icon(
                   icon: const Icon(Icons.share),
-                  label: const Text('分享'),
+                  label: const Text('Share'),
                   onPressed: () {
                     Navigator.pop(context);
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('分享功能即将推出')),
+                      const SnackBar(content: Text('Share feature coming soon')),
                     );
                   },
                 ),
@@ -1217,15 +1217,15 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   void _showFlagInfoWindow(String flagId, LatLng position) {
-    print('尝试显示红旗信息浮窗: $flagId');
+    print('Attempting to display flag information floating window: $flagId');
     
     final flagInfo = _flagInfoMap[flagId];
     if (flagInfo == null) {
-      print('错误: 找不到红旗信息: $flagId');
+      print('Error: Flag information not found: $flagId');
       return;
     }
     
-    print('成功找到红旗信息，准备显示浮窗');
+    print('Successfully found flag information, preparing to display floating window');
     
     _mapController.move(position, _mapController.zoom);
     
@@ -1247,7 +1247,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 const Text(
-                  '标记信息',
+                  'Marker information',
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
@@ -1267,7 +1267,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    '位置: ${position.latitude.toStringAsFixed(4)}, ${position.longitude.toStringAsFixed(4)}',
+                    'Position: ${position.latitude.toStringAsFixed(4)}, ${position.longitude.toStringAsFixed(4)}',
                     style: const TextStyle(fontSize: 14),
                   ),
                 ),
@@ -1290,7 +1290,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             if (flagInfo.weatherData != null) ...[
               const Divider(),
               const Text(
-                '天气信息',
+                'Weather information',
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
@@ -1316,7 +1316,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               ),
               const SizedBox(height: 4),
               Text(
-                '湿度: ${flagInfo.weatherData!.humidity}%, 风速: ${flagInfo.weatherData!.windSpeed} m/s',
+                'Humidity: ${flagInfo.weatherData!.humidity}%, Wind speed: ${flagInfo.weatherData!.windSpeed} m/s',
                 style: const TextStyle(fontSize: 12, color: Colors.grey),
               ),
             ],
@@ -1328,7 +1328,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   const Icon(Icons.music_note, size: 16, color: Colors.purple),
                   const SizedBox(width: 8),
                   Text(
-                    '已生成音乐: ${flagInfo.musicTitle}',
+                    'Music generated: ${flagInfo.musicTitle}',
                     style: const TextStyle(fontSize: 14),
                   ),
                 ],
@@ -1344,7 +1344,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   Expanded(
                     child: ElevatedButton.icon(
                       icon: const Icon(Icons.music_note),
-                      label: const Text('生成音乐'),
+                      label: const Text('Generate music'),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.deepPurple,
                         foregroundColor: Colors.white,
@@ -1360,7 +1360,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   Expanded(
                     child: ElevatedButton.icon(
                       icon: const Icon(Icons.play_arrow),
-                      label: const Text('播放音乐'),
+                      label: const Text('Play music'),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.green,
                         foregroundColor: Colors.white,
@@ -1368,7 +1368,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       onPressed: () {
                         Navigator.pop(context);
                         ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('播放音乐: ${flagInfo.musicTitle}')),
+                          SnackBar(content: Text('Playing music: ${flagInfo.musicTitle}')),
                         );
                       },
                     ),
@@ -1379,7 +1379,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 Expanded(
                   child: ElevatedButton.icon(
                     icon: const Icon(Icons.delete),
-                    label: const Text('删除标记'),
+                    label: const Text('Delete marker'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.red,
                       foregroundColor: Colors.white,
@@ -1439,10 +1439,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   void _deleteFlag(String flagId) {
-    print('开始删除标记: $flagId');
+    print('Starting to delete marker: $flagId');
     
     setState(() {
-      // 1. 保存所有需要保留的标记信息（除了要删除的）
+      // 1. Save all marker information to be retained (except the one to be deleted)
       Map<String, FlagInfo> flagsToKeep = {};
       _flagInfoMap.forEach((id, info) {
         if (id != flagId) {
@@ -1450,18 +1450,18 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         }
       });
       
-      // 2. 清空所有现有标记
+      // 2. Clear all existing markers
       _mapService.clearMarkers();
       _flagInfoMap.clear();
       
-      // 3. 从服务状态中移除
+      // 3. Remove from service status
       _mapService.removeFlagInfo(flagId);
       
-      // 4. 重新添加所有需要保留的标记
+      // 4. Add all markers to be retained
       flagsToKeep.forEach((id, info) {
         _flagInfoMap[id] = info;
         
-        // 重新添加标记到地图
+        // Add markers to the map again
         _mapService.addMarker(
           id: id,
           position: info.position,
@@ -1487,21 +1487,21 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     });
     
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('标记已删除')),
+      const SnackBar(content: Text('Marker deleted')),
     );
   }
 
   void _loadPersistentFlags() {
     final persistentFlags = _mapService.persistentFlagMap;
     
-    // 先清除所有标记
+    // First clear all markers
     _mapService.clearMarkers();
     
     setState(() {
-      _flagInfoMap.clear(); // 清除本地状态
-      _flagInfoMap.addAll(persistentFlags); // 添加持久化的状态
+      _flagInfoMap.clear(); // Clear local state
+      _flagInfoMap.addAll(persistentFlags); // Add persistent state
       
-      // 重新为每个红旗创建标记
+      // Re-create markers for each flag
       _flagInfoMap.forEach((id, info) {
         _mapService.addMarker(
           id: id,
@@ -1533,7 +1533,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       _mapCenterPosition = _mapController.center;
       _mapZoomLevel = _mapController.zoom;
     } catch (e) {
-      print("获取地图状态失败: $e");
+      print("Failed to get map state: $e");
       _mapCenterPosition = _mapService.getDefaultLocation();
       _mapZoomLevel = COUNTRY_ZOOM_LEVEL;
     }
@@ -1546,7 +1546,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         _mapCenterPosition = position;
         _mapZoomLevel = zoom;
       } catch (e) {
-        print('移动地图失败: $e');
+        print('Failed to move map: $e');
         _mapCenterPosition = position;
         _mapZoomLevel = zoom;
       }
@@ -1558,7 +1558,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       _currentCenter = position.center!;
       _currentZoom = position.zoom!;
       
-      // 更新最后的地图状态
+      // Update the last map state
       _lastMapCenter = position.center!;
       _lastMapZoom = position.zoom!;
     });
@@ -1568,21 +1568,21 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     if (_mapController == null) return false;
     
     try {
-      // 尝试读取一个属性或调用一个方法
+      // Try reading a property or calling a method
       var center = _mapController.center;
-      return true; // 如果没有抛出异常，说明控制器就绪
+      return true; // If no exception is thrown, the controller is ready
     } catch (e) {
-      return false; // 捕获到异常，说明控制器未就绪
+      return false; // If an exception is caught, the controller is not ready
     }
   }
 
-  // 添加一个方法来保存当前地图状态
+  // Add a method to save the current map state
   void _saveCurrentMapState() {
     try {
       _lastMapCenter = _mapController.center;
       _lastMapZoom = _mapController.zoom;
     } catch (e) {
-      print('保存地图状态失败: $e');
+      print('Failed to save map state: $e');
     }
   }
 } 
