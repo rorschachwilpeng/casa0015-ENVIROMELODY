@@ -142,11 +142,11 @@
 		</data>
 		<key>Modules/FirebaseFirestore.swiftmodule/Project/arm64-apple-ios-simulator.swiftsourceinfo</key>
 		<data>
-		D6wE0P+7tM2g02IIqKHZzcxRUSw=
+		0vNuldi7OW20cbAb6mTJxoxKFts=
 		</data>
 		<key>Modules/FirebaseFirestore.swiftmodule/Project/x86_64-apple-ios-simulator.swiftsourceinfo</key>
 		<data>
-		B8t90u1Q1/B4GnGI2DfYLRQ+ROY=
+		Vr7rYTobWs80zEeJsVySK+M2+38=
 		</data>
 		<key>Modules/FirebaseFirestore.swiftmodule/arm64-apple-ios-simulator.abi.json</key>
 		<data>
@@ -414,14 +414,14 @@
 		<dict>
 			<key>hash2</key>
 			<data>
-			FkXgfowuw9KaUzmOS4HiZAaNDiutB9VG7D/Pxd5+EIE=
+			Q+jEpBBrnw0Xrkij2yFRs+m71dB+qOegrR1tL5uvA4Y=
 			</data>
 		</dict>
 		<key>Modules/FirebaseFirestore.swiftmodule/Project/x86_64-apple-ios-simulator.swiftsourceinfo</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			Tx9Kbh52vg1zL16VmHV9xfDXgvPwoX8hEOntj5jL9No=
+			yM5qqim4JF/VAp0PKRuOvONpW3wWGpeSaPsWviGhyYQ=
 			</data>
 		</dict>
 		<key>Modules/FirebaseFirestore.swiftmodule/arm64-apple-ios-simulator.abi.json</key>
