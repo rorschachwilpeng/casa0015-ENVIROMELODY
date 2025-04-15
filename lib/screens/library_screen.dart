@@ -8,6 +8,13 @@ import 'package:http/http.dart' as http;
 import 'package:flutter/services.dart';
 import '../services/audio_player_manager.dart';
 
+// Define the sort option enum
+enum SortOption {
+  newest, // newest created (default)
+  oldest, // oldest created
+  duration // duration
+}
+
 class LibraryScreen extends StatefulWidget {
   const LibraryScreen({Key? key}) : super(key: key);
 
@@ -20,6 +27,10 @@ class _LibraryScreenState extends State<LibraryScreen> {
   final AudioPlayerManager _audioPlayerManager = AudioPlayerManager();
   
   bool _isLoading = true;
+  
+  // Add sort related state variables
+  SortOption _currentSortOption = SortOption.newest; // Default to newest created
+  List<MusicItem> _filteredMusicList = []; // Filtered music list after sorting
   
   @override
   void initState() {
@@ -50,6 +61,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
   void _refreshLibrary() {
     if (mounted) {
       setState(() {});
+      _applySorting(); // Refresh when the music library is updated
     }
   }
   
@@ -68,6 +80,9 @@ class _LibraryScreenState extends State<LibraryScreen> {
     
     try {
       await _libraryManager.initialize();
+      
+      // Apply sorting
+      _applySorting();
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -81,6 +96,95 @@ class _LibraryScreenState extends State<LibraryScreen> {
         });
       }
     }
+  }
+  
+  // Apply sorting method
+  void _applySorting() {
+    final musicList = List<MusicItem>.from(_libraryManager.allMusic);
+    
+    // Sort based on the current selected sort option
+    switch (_currentSortOption) {
+      case SortOption.newest:
+        musicList.sort((a, b) => b.createdAt.compareTo(a.createdAt)); // Descending, newest first
+        break;
+      case SortOption.oldest:
+        musicList.sort((a, b) => a.createdAt.compareTo(b.createdAt)); // Ascending, oldest first
+        break;
+      case SortOption.duration:
+        // For duration sorting, we need to get the audio duration first
+        // Duration information may need to be obtained from AudioPlayer, here it is temporarily replaced by the title length
+        // In the actual project, the duration information should be stored for each MusicItem
+        musicList.sort((a, b) => a.title.length.compareTo(b.title.length));
+        break;
+    }
+    
+    setState(() {
+      _filteredMusicList = musicList;
+    });
+  }
+
+  // Change sort option
+  void _changeSortOption(SortOption option) {
+    setState(() {
+      _currentSortOption = option;
+    });
+    
+    // Apply new sorting
+    _applySorting();
+  }
+  
+  // Get sort option display text
+  String _getSortOptionLabel(SortOption option) {
+    switch (option) {
+      case SortOption.newest:
+        return 'Newest created';
+      case SortOption.oldest:
+        return 'Oldest created';
+      case SortOption.duration:
+        return 'Audio duration';
+    }
+  }
+  
+  // Build sort control UI
+  Widget _buildSortControls() {
+    return Padding(
+      padding: const EdgeInsets.all(8.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          Text('Sorting method: ', style: TextStyle(color: Colors.grey[600])),
+          DropdownButton<SortOption>(
+            value: _currentSortOption,
+            underline: Container(height: 1, color: Colors.grey[300]),
+            icon: const Icon(Icons.arrow_drop_down),
+            items: SortOption.values.map((option) {
+              return DropdownMenuItem(
+                value: option,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      option == SortOption.newest || option == SortOption.oldest 
+                          ? Icons.access_time 
+                          : Icons.timer,
+                      size: 16,
+                      color: Colors.grey[600],
+                    ),
+                    const SizedBox(width: 8),
+                    Text(_getSortOptionLabel(option)),
+                  ],
+                ),
+              );
+            }).toList(),
+            onChanged: (option) {
+              if (option != null) {
+                _changeSortOption(option);
+              }
+            },
+          ),
+        ],
+      ),
+    );
   }
   
   // Play music
@@ -123,7 +227,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
     );
     
     if (confirm == true) {
-      // If this music is currently playing, stop playing
+      // If the music is currently playing, stop playing
       if (_audioPlayerManager.currentMusicId == id && _audioPlayerManager.isPlaying) {
         _audioPlayerManager.stopMusic();
       }
@@ -144,7 +248,10 @@ class _LibraryScreenState extends State<LibraryScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final musicList = _libraryManager.allMusic;
+    // Use the filtered list, if it is empty, use the original list
+    final musicList = _filteredMusicList.isEmpty && !_isLoading 
+        ? _libraryManager.allMusic 
+        : _filteredMusicList;
     
     return Scaffold(
       appBar: AppBar(
@@ -161,85 +268,94 @@ class _LibraryScreenState extends State<LibraryScreen> {
           ? const Center(child: CircularProgressIndicator())
           : musicList.isEmpty
               ? _buildEmptyView()
-              : RefreshIndicator(
-                  onRefresh: _loadLibrary,
-                  child: ListView.builder(
-                    itemCount: musicList.length,
-                    itemBuilder: (context, index) {
-                      final music = musicList[index];
-                      final bool isPlaying = _audioPlayerManager.currentMusicId == music.id && 
-                                            _audioPlayerManager.isPlaying;
-                      
-                      return Dismissible(
-                        key: Key(music.id),
-                        background: Container(
-                          color: Colors.red,
-                          alignment: Alignment.centerRight,
-                          padding: const EdgeInsets.only(right: 16.0),
-                          child: const Icon(Icons.delete, color: Colors.white),
-                        ),
-                        direction: DismissDirection.endToStart,
-                        confirmDismiss: (direction) async {
-                          return await showDialog<bool>(
-                            context: context,
-                            builder: (context) => AlertDialog(
-                              title: const Text('Confirm deletion'),
-                              content: const Text('Are you sure you want to delete this music?'),
-                              actions: [
-                                TextButton(
-                                  onPressed: () => Navigator.of(context).pop(false),
-                                  child: const Text('Cancel'),
+              : Column(
+                  children: [
+                    // Add sort control component
+                    _buildSortControls(),
+                    // Use Expanded to wrap ListView, ensuring it does not overflow
+                    Expanded(
+                      child: RefreshIndicator(
+                        onRefresh: _loadLibrary,
+                        child: ListView.builder(
+                          itemCount: musicList.length,
+                          itemBuilder: (context, index) {
+                            final music = musicList[index];
+                            final bool isPlaying = _audioPlayerManager.currentMusicId == music.id && 
+                                                 _audioPlayerManager.isPlaying;
+                            
+                            return Dismissible(
+                              key: Key(music.id),
+                              background: Container(
+                                color: Colors.red,
+                                alignment: Alignment.centerRight,
+                                padding: const EdgeInsets.only(right: 16.0),
+                                child: const Icon(Icons.delete, color: Colors.white),
+                              ),
+                              direction: DismissDirection.endToStart,
+                              confirmDismiss: (direction) async {
+                                return await showDialog<bool>(
+                                  context: context,
+                                  builder: (context) => AlertDialog(
+                                    title: const Text('Confirm deletion'),
+                                    content: const Text('Are you sure you want to delete this music?'),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () => Navigator.of(context).pop(false),
+                                        child: const Text('Cancel'),
+                                      ),
+                                      TextButton(
+                                        onPressed: () => Navigator.of(context).pop(true),
+                                        child: const Text('Delete'),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              },
+                              onDismissed: (direction) => _deleteMusic(music.id),
+                              child: ListTile(
+                                leading: CircleAvatar(
+                                  backgroundColor: Theme.of(context).primaryColor.withOpacity(0.1),
+                                  child: const Icon(Icons.music_note),
                                 ),
-                                TextButton(
-                                  onPressed: () => Navigator.of(context).pop(true),
-                                  child: const Text('Delete'),
+                                title: Text(
+                                  music.title.isEmpty ? 'Untitled Music' : music.title,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
-                              ],
-                            ),
-                          );
-                        },
-                        onDismissed: (direction) => _deleteMusic(music.id),
-                        child: ListTile(
-                          leading: CircleAvatar(
-                            backgroundColor: Theme.of(context).primaryColor.withOpacity(0.1),
-                            child: const Icon(Icons.music_note),
-                          ),
-                          title: Text(
-                            music.title.isEmpty ? 'Untitled Music' : music.title,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          subtitle: Text(
-                            '${music.prompt.isEmpty ? 'No prompt' : music.prompt}\n${music.createdAt.toString().substring(0, 16)}',
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          trailing: IconButton(
-                            icon: Icon(
-                              isPlaying ? Icons.pause : Icons.play_arrow,
-                              color: isPlaying ? Colors.blue : null,
-                            ),
-                            onPressed: () {
-                              if (isPlaying) {
-                                _pauseMusic();
-                              } else {
-                                _playMusic(music);
-                              }
-                            },
-                          ),
-                          onTap: () {
-                            // You can navigate to the details page
-                            // Navigator.of(context).push(
-                            //   MaterialPageRoute(
-                            //     builder: (context) => MusicDetailScreen(music: music),
-                            //   ),
-                            // );
+                                subtitle: Text(
+                                  '${music.prompt.isEmpty ? 'No prompt' : music.prompt}\n${music.createdAt.toString().substring(0, 16)}',
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                trailing: IconButton(
+                                  icon: Icon(
+                                    isPlaying ? Icons.pause : Icons.play_arrow,
+                                    color: isPlaying ? Colors.blue : null,
+                                  ),
+                                  onPressed: () {
+                                    if (isPlaying) {
+                                      _pauseMusic();
+                                    } else {
+                                      _playMusic(music);
+                                    }
+                                  },
+                                ),
+                                onTap: () {
+                                  // You can navigate to the details page
+                                  // Navigator.of(context).push(
+                                  //   MaterialPageRoute(
+                                  //     builder: (context) => MusicDetailScreen(music: music),
+                                  //   ),
+                                  // );
+                                },
+                                onLongPress: () => _showMusicOptions(music),
+                              ),
+                            );
                           },
-                          onLongPress: () => _showMusicOptions(music),
                         ),
-                      );
-                    },
-                  ),
+                      ),
+                    ),
+                  ],
                 ),
     );
   }
@@ -307,7 +423,6 @@ class _LibraryScreenState extends State<LibraryScreen> {
             title: const Text('Share'),
             onTap: () {
               Navigator.pop(context);
-              // TODO: Implement the share function
             },
           ),
           ListTile(
@@ -331,7 +446,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
     );
   }
 
-  // Add a diagnostic method
+  // Add diagnostic method
   void _showMusicInfo(MusicItem music) {
     showDialog(
       context: context,
