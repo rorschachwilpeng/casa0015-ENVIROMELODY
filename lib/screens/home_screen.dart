@@ -1078,45 +1078,36 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       final prompt = customPrompt ?? weatherData.buildMusicPrompt();
       final musicTitle = '${weatherData.cityName} ${weatherData.weatherDescription} music';
       
+      // 使用StabilityAudioService生成真实的音乐文件
+      final StabilityAudioService audioService = StabilityAudioService(
+        apiKey: AppConfig.stabilityApiKey
+      );
+      
+      // 调用服务生成音乐
+      final result = await audioService.generateMusic(
+        prompt,
+        outputFormat: "mp3",
+        durationSeconds: 20,
+        steps: 30,
+        saveLocally: true,
+      );
+      
+      // 从结果中获取音频URL
+      final audioUrl = result['audio_url'];
+      // 确保audioUrl以file://开头
+      final String finalAudioUrl = audioUrl.startsWith('file://') 
+          ? audioUrl 
+          : 'file://$audioUrl';
+      
       // 创建一个唯一的音乐ID
       final musicId = 'music_${DateTime.now().millisecondsSinceEpoch}';
-      
-      // 创建实际的音频文件路径
-      int timestamp = DateTime.now().millisecondsSinceEpoch;
-      Directory appDocDir = await getApplicationDocumentsDirectory();
-      
-      // 确保目录存在
-      Directory audioDir = Directory('${appDocDir.path}/audio');
-      if (!await audioDir.exists()) {
-        await audioDir.create(recursive: true);
-      }
-      
-      // 创建一个示例音频文件（使用应用包中的资源文件）
-      String filePath = '${audioDir.path}/stability_audio_$timestamp.mp3';
-      
-      // 复制示例音频文件到该路径
-      try {
-        // 从应用资源中复制示例音频文件
-        ByteData data = await rootBundle.load('assets/audio/sample.mp3');
-        List<int> bytes = data.buffer.asUint8List();
-        File file = File(filePath);
-        await file.writeAsBytes(bytes);
-      } catch (e) {
-        // 如果没有示例音频或复制失败，创建一个空文件
-        File file = File(filePath);
-        await file.writeAsBytes([]);
-        print('创建空音频文件: $e');
-      }
-      
-      // 使用file://协议确保播放器可以识别本地文件
-      final audioUrl = 'file://$filePath';
       
       // 创建MusicItem对象
       final musicItem = MusicItem(
         id: musicId,
         title: musicTitle,
         prompt: prompt,
-        audioUrl: audioUrl,
+        audioUrl: finalAudioUrl,
         status: 'complete',
         createdAt: DateTime.now(),
       );
