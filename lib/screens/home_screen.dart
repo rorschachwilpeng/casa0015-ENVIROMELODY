@@ -158,35 +158,37 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      // When the application resumes from the background
+      // 当应用程序从后台恢复时
       if (_hasInitializedOnce) {
-        // If it has been initialized before, only recreate the controller but do not move to the current location
+        // 如果之前已经初始化过，则仅重新创建控制器但不移至当前位置
         _mapController = MapController();
         _initMapService();
         
-        // After the next frame is drawn, restore the map position and zoom level
+        // 在下一帧绘制后，恢复地图位置和缩放级别
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (_isMapReady) {
             try {
               _mapController.move(_lastMapCenter, _lastMapZoom);
+              // 重新加载所有标记
+              _loadPersistentFlags();
             } catch (e) {
-              print('Error restoring map position: $e');
+              print('恢复地图位置时出错: $e');
             }
           }
         });
       } else {
-        // If it is the first initialization, allow to locate to the current location
+        // 如果是第一次初始化，允许定位到当前位置
         _mapController = MapController();
         _initMapService();
         _hasInitializedOnce = true;
       }
     } else if (state == AppLifecycleState.paused) {
-      // When the application enters the background, save the current map state
+      // 当应用程序进入后台时，保存当前地图状态
       try {
         _lastMapCenter = _mapController.center;
         _lastMapZoom = _mapController.zoom;
       } catch (e) {
-        print('Error saving map position: $e');
+        print('保存地图状态时出错: $e');
       }
     }
   }
@@ -515,7 +517,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         child: Icon(
           Icons.flag,
           color: Colors.red,
-          size: _mapService.calculateMarkerSize(15.0),
+          size: 15.0, // 使用固定大小
         ),
       ),
       onTap: () {
@@ -548,7 +550,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       child: Icon(
         Icons.flag,
         color: Colors.red,
-        size: _mapService.calculateMarkerSize(15.0), // Slightly increase icon size
+        size: 15.0, // 使用固定尺寸
       ),
     );
   }
@@ -1073,16 +1075,16 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     );
     
     try {
-      // 使用用户提供的prompt或默认prompt
+      // Use the user-provided prompt or default prompt
       final prompt = customPrompt ?? weatherData.buildMusicPrompt();
       final musicTitle = '${weatherData.cityName} ${weatherData.weatherDescription} music';
       
-      // 使用StabilityAudioService生成真实的音乐文件
+      // Use StabilityAudioService to generate a real music file
       final StabilityAudioService audioService = StabilityAudioService(
         apiKey: AppConfig.stabilityApiKey
       );
       
-      // 调用服务生成音乐
+      // Call the service to generate music
       final result = await audioService.generateMusic(
         prompt,
         outputFormat: "mp3",
@@ -1091,17 +1093,17 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         saveLocally: true,
       );
       
-      // 从结果中获取音频URL
+      // Get the audio URL from the result
       final audioUrl = result['audio_url'];
-      // 确保audioUrl以file://开头
+      // Ensure audioUrl starts with file://
       final String finalAudioUrl = audioUrl.startsWith('file://') 
           ? audioUrl 
           : 'file://$audioUrl';
       
-      // 创建一个唯一的音乐ID
+      // Create a unique music ID
       final musicId = 'music_${DateTime.now().millisecondsSinceEpoch}';
       
-      // 创建MusicItem对象
+      // Create a MusicItem object
       final musicItem = MusicItem(
         id: musicId,
         title: musicTitle,
@@ -1111,13 +1113,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         createdAt: DateTime.now(),
       );
       
-      // 添加到MusicLibraryManager
+      // Add to MusicLibraryManager
       final MusicLibraryManager libraryManager = MusicLibraryManager();
       await libraryManager.addMusic(musicItem);
       
-      // 关键修改：检查mounted状态和地图控制器状态，避免更新已销毁的组件
       if (mounted) {
-        // 更新本地状态而不触发地图操作
+        // Update local state without triggering map operations
         if (_flagInfoMap.containsKey(flagId)) {
           setState(() {
             final flagInfo = _flagInfoMap[flagId]!;
@@ -1131,21 +1132,21 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             _flagInfoMap[flagId] = updatedInfo;
           });
           
-          // 在非UI更新部分安全地更新地图服务
+          // Safely update the map service in the non-UI update part
           try {
             _mapService.saveFlagInfo(flagId, _flagInfoMap[flagId]!);
           } catch (e) {
-            print('无法更新地图标记: $e');
+            print('Failed to update map marker: $e');
           }
         }
         
-        // 安全地关闭对话框
+        // Safely close the dialog
         if (Navigator.canPop(context)) {
-          Navigator.of(context).pop(); // 关闭加载对话框
+          Navigator.of(context).pop(); // Close the loading dialog
         }
         
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('成功生成音乐: $musicTitle')),
+          SnackBar(content: Text('Successfully generated music: $musicTitle')),
         );
       }
       
@@ -1153,10 +1154,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       print('Error generating music: $e');
       
       if (mounted && Navigator.canPop(context)) {
-        Navigator.of(context).pop(); // 关闭加载对话框
+        Navigator.of(context).pop(); // Close the loading dialog
         
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('生成音乐失败: $e')),
+          SnackBar(content: Text('Failed to generate music: $e')),
         );
       }
     }
@@ -1469,7 +1470,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   if (flagInfo.musicTitle == null && flagInfo.weatherData != null)
                     ElevatedButton.icon(
                       icon: const Icon(Icons.music_note),
-                      label: const Text('生成音乐'),
+                      label: const Text('Generate Music'),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.deepPurple,
                         foregroundColor: Colors.white,
@@ -1494,23 +1495,23 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       onPressed: () {
                         Navigator.pop(context);
                         
-                        // 查找音乐库中对应的音乐项
+                        // Find the corresponding music item in the music library
                         final libraryManager = MusicLibraryManager();
                         final musicItems = libraryManager.allMusic.where(
                           (item) => item.title == flagInfo.musicTitle
                         ).toList();
                         
                         if (musicItems.isNotEmpty) {
-                          // 使用实际存在的音乐项
+                          // Use the actual existing music item
                           final playerManager = AudioPlayerManager();
                           playerManager.playMusic(musicItems[0].id, musicItems[0].audioUrl);
                           
                           ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('播放音乐: ${flagInfo.musicTitle}')),
+                            SnackBar(content: Text('Playing music: ${flagInfo.musicTitle}')),
                           );
                         } else {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('未能找到音乐: ${flagInfo.musicTitle}')),
+                            SnackBar(content: Text('Failed to find music: ${flagInfo.musicTitle}')),
                           );
                         }
                       },
@@ -1616,7 +1617,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             child: Icon(
               Icons.flag,
               color: Colors.red,
-              size: _mapService.calculateMarkerSize(15.0),
+              size: 15.0, //Use fixed size instead of dynamic calculation
             ),
           ),
           onTap: () {
@@ -1644,7 +1645,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       _flagInfoMap.clear(); // Clear local state
       _flagInfoMap.addAll(persistentFlags); // Add persistent state
       
-      // Re-create markers for each flag
+      // Re-create markers for each flag, using fixed size
       _flagInfoMap.forEach((id, info) {
         _mapService.addMarker(
           id: id,
@@ -1657,7 +1658,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             child: Icon(
               Icons.flag,
               color: Colors.red,
-              size: _mapService.calculateMarkerSize(15.0),
+              size: 15.0, //Use fixed size instead of dynamic calculation
             ),
           ),
           onTap: () {

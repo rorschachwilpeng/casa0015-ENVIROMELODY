@@ -173,10 +173,10 @@ class FlutterMapService extends ChangeNotifier {
         return;
       }
       
-      // 添加安全检查以避免使用已销毁的控制器
+      // Add safety check to avoid using a destroyed controller
       try {
-        // 检查地图控制器是否仍然有效
-        var testPoint = _mapController!.center; // 尝试访问属性以验证控制器状态
+        // Check if the map controller is still valid
+        var testPoint = _mapController!.center; // Try to access the property to verify the controller state
         
         _mapController!.move(
           LatLng(_currentLocation!.latitude!, _currentLocation!.longitude!),
@@ -185,7 +185,7 @@ class FlutterMapService extends ChangeNotifier {
         print("Successfully moved map to current location");
       } catch (e) {
         print("Failed to move map: $e");
-        // 不要在此处重新抛出异常，而是优雅地处理错误
+        // Do not throw an exception here, handle the error gracefully
       }
     } catch (e) {
       print("Error moving to current location: $e");
@@ -388,7 +388,7 @@ class FlutterMapService extends ChangeNotifier {
     super.notifyListeners();
   }
   
-  // 在 FlutterMapService 类中添加这个方法
+  // Add this method in the FlutterMapService class
   void clearAndRebuildMarkers(String excludeId) {
     // Save all markers except the specified ID
     final markersToKeep = _markers.where((marker) => !marker.key.toString().contains(excludeId)).toList();
@@ -422,6 +422,80 @@ class FlutterMapService extends ChangeNotifier {
     _persistentFlagMap.remove(flagId);
     // Also remove the corresponding marker
     removeMarker(flagId);
+    // Notify listener to update
+    notifyListeners();
+  }
+  
+  // Add a new method to reset marker size
+  void resetMarkersSize() {
+    // Save all current marker information
+    final List<Map<String, dynamic>> markersData = _markers.map((marker) {
+      // Try to get the ID of the marker
+      String id = marker.key.toString();
+      id = id.replaceAll('Key("', '').replaceAll('")', '');
+      
+      // Get the position of the marker
+      LatLng position = marker.point;
+      
+      // Recursively find the gesture detector and extract the click event
+      VoidCallback? onTap;
+      VoidCallback? onLongPress;
+      
+      // Marker type (normal or music)
+      bool isMusic = id.contains('music_');
+      
+      return {
+        'id': id,
+        'position': position,
+        'isMusic': isMusic,
+      };
+    }).toList();
+    
+    // Clear all markers
+    _markers.clear();
+    
+    // Use fixed base size to recreate markers
+    for (var markerData in markersData) {
+      if (markerData['isMusic']) {
+        // Recreate music marker
+        addMusicMarker(
+          id: markerData['id'],
+          title: '',
+          position: markerData['position'],
+        );
+      } else {
+        // Recreate normal marker
+        final flagId = markerData['id'];
+        final position = markerData['position'];
+        
+        // Check if persistent flag information exists
+        if (_persistentFlagMap.containsKey(flagId)) {
+          addMarker(
+            id: flagId,
+            position: position,
+            title: '',
+            icon: Container(
+              width: 40,
+              height: 40,
+              alignment: Alignment.center,
+              child: Icon(
+                Icons.flag,
+                color: Colors.red,
+                size: 15.0,  // Use fixed size instead of dynamic calculation
+              ),
+            ),
+            onTap: () {
+              // We need to handle the click event in HomeScreen
+              print('Flag clicked: $flagId');
+            },
+            onLongPress: () {
+              // We need to handle the long press event in HomeScreen
+            },
+          );
+        }
+      }
+    }
+    
     // Notify listener to update
     notifyListeners();
   }
