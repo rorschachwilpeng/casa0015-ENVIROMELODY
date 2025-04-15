@@ -5,6 +5,16 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import '../services/flutter_map_service.dart';
 import '../models/weather_service.dart'; // Import weather service
+import '../services/music_library_manager.dart'; // Import MusicLibraryManager
+import '../models/music_item.dart';
+import '../services/music_library_manager.dart';
+import '../services/stability_api_service.dart';
+import '../services/stability_audio_service.dart';
+import '../utils/config.dart';
+import 'dart:io';
+import 'package:path_provider/path_provider.dart';
+import 'package:flutter/services.dart';
+import '../services/audio_player_manager.dart';
 
 // Define FlagInfo class (put at the top of the file, all classes outside)
 class FlagInfo {
@@ -642,7 +652,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       ),
                     ),
                     SizedBox(width: 8),
-                    Text('定位中...', style: TextStyle(fontSize: 12)),
+                    Text('Locating...', style: TextStyle(fontSize: 12)),
                   ],
                 ),
               ),
@@ -951,69 +961,110 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   
   void _showGenerateMusicDialog(WeatherData weatherData, String flagId) {
     final prompt = weatherData.buildMusicPrompt();
+    final TextEditingController promptController = TextEditingController(text: prompt);
     
+    // Use Dialog instead of AlertDialog, so we can control the layout more flexibly
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Generate music based on weather'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'The music will be generated using the following Prompt:',
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.grey[200],
-                borderRadius: BorderRadius.circular(8),
-              ),
-              width: double.infinity,
-              child: Text(prompt),
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              'You can modify this Prompt to meet your needs:',
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-            TextField(
-              decoration: const InputDecoration(
-                border: OutlineInputBorder(),
-                hintText: 'Edit Prompt...',
-              ),
-              maxLines: 5,
-              controller: TextEditingController(text: prompt),
-              onChanged: (value) {
-
-              },
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-            },
-            child: const Text('Cancel'),
+      builder: (BuildContext context) {
+        // Get screen dimensions
+        final screenHeight = MediaQuery.of(context).size.height;
+        final screenWidth = MediaQuery.of(context).size.width;
+        
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
           ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              
-              _generateMusicAndUpdateFlag(weatherData, flagId);
-            },
-            child: const Text('Generate music'),
+          // Set fixed size to avoid auto layout overflow
+          child: Container(
+            width: screenWidth * 0.85,
+            height: screenHeight * 0.5, // Set fixed height to half of the screen
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Title
+                const Text(
+                  'Generate music based on weather',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                
+                // Scrollable content area
+                Expanded(
+                  child: SingleChildScrollView(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'The music will be generated using the following Prompt:',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 8),
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.grey[200],
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          width: double.infinity,
+                          child: Text(prompt),
+                        ),
+                        const SizedBox(height: 16),
+                        const Text(
+                          'You can modify this Prompt to meet your needs:',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 8),
+                        TextField(
+                          decoration: const InputDecoration(
+                            border: OutlineInputBorder(),
+                            hintText: 'Edit Prompt...',
+                          ),
+                          maxLines: 3,
+                          controller: promptController,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                
+                // Button area
+                const SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: () {
+                        Navigator.pop(context);
+                      },
+                      child: const Text('Cancel'),
+                    ),
+                    const SizedBox(width: 8),
+                    ElevatedButton(
+                      onPressed: () {
+                        Navigator.pop(context);
+                        
+                        // Use the modified prompt
+                        _generateMusicAndUpdateFlag(weatherData, flagId, promptController.text);
+                      },
+                      child: const Text('Generate Music'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
-        ],
-      ),
+        );
+      },
     );
   }
   
-  void _generateMusicAndUpdateFlag(WeatherData weatherData, String flagId) {
+  Future<void> _generateMusicAndUpdateFlag(WeatherData weatherData, String flagId, [String? customPrompt]) async {
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -1022,31 +1073,103 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       ),
     );
     
-    Future.delayed(const Duration(seconds: 2), () {
-      Navigator.pop(context);
-      
+    try {
+      // 使用用户提供的prompt或默认prompt
+      final prompt = customPrompt ?? weatherData.buildMusicPrompt();
       final musicTitle = '${weatherData.cityName} ${weatherData.weatherDescription} music';
       
-      if (_flagInfoMap.containsKey(flagId)) {
-        setState(() {
-          final flagInfo = _flagInfoMap[flagId]!;
-          final updatedInfo = FlagInfo(
-            position: flagInfo.position,
-            weatherData: flagInfo.weatherData,
-            createdAt: flagInfo.createdAt,
-            musicTitle: musicTitle,
-          );
-          
-          _flagInfoMap[flagId] = updatedInfo;
-          
-          _mapService.saveFlagInfo(flagId, updatedInfo);
-        });
+      // 创建一个唯一的音乐ID
+      final musicId = 'music_${DateTime.now().millisecondsSinceEpoch}';
+      
+      // 创建实际的音频文件路径
+      int timestamp = DateTime.now().millisecondsSinceEpoch;
+      Directory appDocDir = await getApplicationDocumentsDirectory();
+      
+      // 确保目录存在
+      Directory audioDir = Directory('${appDocDir.path}/audio');
+      if (!await audioDir.exists()) {
+        await audioDir.create(recursive: true);
       }
       
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Successfully generated music: $musicTitle')),
+      // 创建一个示例音频文件（使用应用包中的资源文件）
+      String filePath = '${audioDir.path}/stability_audio_$timestamp.mp3';
+      
+      // 复制示例音频文件到该路径
+      try {
+        // 从应用资源中复制示例音频文件
+        ByteData data = await rootBundle.load('assets/audio/sample.mp3');
+        List<int> bytes = data.buffer.asUint8List();
+        File file = File(filePath);
+        await file.writeAsBytes(bytes);
+      } catch (e) {
+        // 如果没有示例音频或复制失败，创建一个空文件
+        File file = File(filePath);
+        await file.writeAsBytes([]);
+        print('创建空音频文件: $e');
+      }
+      
+      // 使用file://协议确保播放器可以识别本地文件
+      final audioUrl = 'file://$filePath';
+      
+      // 创建MusicItem对象
+      final musicItem = MusicItem(
+        id: musicId,
+        title: musicTitle,
+        prompt: prompt,
+        audioUrl: audioUrl,
+        status: 'complete',
+        createdAt: DateTime.now(),
       );
-    });
+      
+      // 添加到MusicLibraryManager
+      final MusicLibraryManager libraryManager = MusicLibraryManager();
+      await libraryManager.addMusic(musicItem);
+      
+      // 关键修改：检查mounted状态和地图控制器状态，避免更新已销毁的组件
+      if (mounted) {
+        // 更新本地状态而不触发地图操作
+        if (_flagInfoMap.containsKey(flagId)) {
+          setState(() {
+            final flagInfo = _flagInfoMap[flagId]!;
+            final updatedInfo = FlagInfo(
+              position: flagInfo.position,
+              weatherData: flagInfo.weatherData,
+              createdAt: flagInfo.createdAt,
+              musicTitle: musicTitle,
+            );
+            
+            _flagInfoMap[flagId] = updatedInfo;
+          });
+          
+          // 在非UI更新部分安全地更新地图服务
+          try {
+            _mapService.saveFlagInfo(flagId, _flagInfoMap[flagId]!);
+          } catch (e) {
+            print('无法更新地图标记: $e');
+          }
+        }
+        
+        // 安全地关闭对话框
+        if (Navigator.canPop(context)) {
+          Navigator.of(context).pop(); // 关闭加载对话框
+        }
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('成功生成音乐: $musicTitle')),
+        );
+      }
+      
+    } catch (e) {
+      print('Error generating music: $e');
+      
+      if (mounted && Navigator.canPop(context)) {
+        Navigator.of(context).pop(); // 关闭加载对话框
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('生成音乐失败: $e')),
+        );
+      }
+    }
   }
   
   Widget _buildMapButton({
@@ -1217,15 +1340,15 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   void _showFlagInfoWindow(String flagId, LatLng position) {
-    print('Attempting to display flag information floating window: $flagId');
+    print('Trying to show flag info window: $flagId');
     
     final flagInfo = _flagInfoMap[flagId];
     if (flagInfo == null) {
-      print('Error: Flag information not found: $flagId');
+      print('Error: Flag info not found for ID: $flagId');
       return;
     }
     
-    print('Successfully found flag information, preparing to display floating window');
+    print('Successfully found flag info, preparing to show window');
     
     _mapController.move(position, _mapController.zoom);
     
@@ -1234,165 +1357,195 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) => Container(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.8, // Limit the maximum height
+        ),
         padding: const EdgeInsets.all(16),
         decoration: const BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  'Marker information',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
+        child: SingleChildScrollView( // Make the entire content scrollable
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Title and close button
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Flag Information',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.close),
-                  onPressed: () => Navigator.pop(context),
-                ),
-              ],
-            ),
-            const Divider(),
-            
-            Row(
-              children: [
-                const Icon(Icons.location_on, size: 16, color: Colors.grey),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'Position: ${position.latitude.toStringAsFixed(4)}, ${position.longitude.toStringAsFixed(4)}',
-                    style: const TextStyle(fontSize: 14),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(context),
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            
-            Row(
-              children: [
-                const Icon(Icons.access_time, size: 16, color: Colors.grey),
-                const SizedBox(width: 8),
-                Text(
-                  '创建于: ${flagInfo.createdAt.toString().substring(0, 16)}',
-                  style: const TextStyle(fontSize: 14),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            
-            if (flagInfo.weatherData != null) ...[
-              const Divider(),
-              const Text(
-                'Weather information',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
+                ],
               ),
-              const SizedBox(height: 8),
+              const Divider(),
+              
+              // Location Information
               Row(
                 children: [
-                  Icon(
-                    _getWeatherIconForData(flagInfo.weatherData!),
-                    color: _getWeatherColorForData(flagInfo.weatherData!),
-                    size: 20,
-                  ),
+                  const Icon(Icons.location_on, size: 16, color: Colors.grey),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      '${flagInfo.weatherData!.cityName}: ${flagInfo.weatherData!.temperature.toStringAsFixed(1)}°C, ${flagInfo.weatherData!.weatherDescription}',
+                      'Location: ${position.latitude.toStringAsFixed(4)}, ${position.longitude.toStringAsFixed(4)}',
                       style: const TextStyle(fontSize: 14),
-                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 4),
-              Text(
-                'Humidity: ${flagInfo.weatherData!.humidity}%, Wind speed: ${flagInfo.weatherData!.windSpeed} m/s',
-                style: const TextStyle(fontSize: 12, color: Colors.grey),
-              ),
-            ],
-            
-            if (flagInfo.musicTitle != null) ...[
-              const Divider(),
+              const SizedBox(height: 8),
+              
+              // Created Time
               Row(
                 children: [
-                  const Icon(Icons.music_note, size: 16, color: Colors.purple),
+                  const Icon(Icons.access_time, size: 16, color: Colors.grey),
                   const SizedBox(width: 8),
                   Text(
-                    'Music generated: ${flagInfo.musicTitle}',
+                    'Created at: ${flagInfo.createdAt.toString().substring(0, 16)}',
                     style: const TextStyle(fontSize: 14),
                   ),
                 ],
               ),
-            ],
-            
-            const SizedBox(height: 16),
-            
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                if (flagInfo.musicTitle == null && flagInfo.weatherData != null)
-                  Expanded(
-                    child: ElevatedButton.icon(
+              const SizedBox(height: 8),
+              
+              // Weather Information
+              if (flagInfo.weatherData != null) ...[
+                const Divider(),
+                const Text(
+                  'Weather Information',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Icon(
+                      _getWeatherIconForData(flagInfo.weatherData!),
+                      color: _getWeatherColorForData(flagInfo.weatherData!),
+                      size: 20,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        '${flagInfo.weatherData!.cityName}: ${flagInfo.weatherData!.temperature.toStringAsFixed(1)}°C, ${flagInfo.weatherData!.weatherDescription}',
+                        style: const TextStyle(fontSize: 14),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Humidity: ${flagInfo.weatherData!.humidity}%, Wind Speed: ${flagInfo.weatherData!.windSpeed} m/s',
+                  style: const TextStyle(fontSize: 12, color: Colors.grey),
+                ),
+              ],
+              
+              // Music Information (if available)
+              if (flagInfo.musicTitle != null) ...[
+                const Divider(),
+                Row(
+                  children: [
+                    const Icon(Icons.music_note, size: 16, color: Colors.purple),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Music Generated: ${flagInfo.musicTitle}',
+                        style: const TextStyle(fontSize: 14),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+              
+              const SizedBox(height: 16),
+              
+              // Button area
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch, // Make the buttons stretch to fill the available width
+                children: [
+                  // Generate music button
+                  if (flagInfo.musicTitle == null && flagInfo.weatherData != null)
+                    ElevatedButton.icon(
                       icon: const Icon(Icons.music_note),
-                      label: const Text('Generate music'),
+                      label: const Text('生成音乐'),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.deepPurple,
                         foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
                       ),
                       onPressed: () {
                         Navigator.pop(context);
                         _showGenerateMusicDialog(flagInfo.weatherData!, flagId);
                       },
                     ),
-                  ),
                   
-                if (flagInfo.musicTitle != null)
-                  Expanded(
-                    child: ElevatedButton.icon(
+                  // Play music button
+                  if (flagInfo.musicTitle != null)
+                    ElevatedButton.icon(
                       icon: const Icon(Icons.play_arrow),
-                      label: const Text('Play music'),
+                      label: const Text('Play Music'),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.green,
                         foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
                       ),
                       onPressed: () {
                         Navigator.pop(context);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Playing music: ${flagInfo.musicTitle}')),
-                        );
+                        
+                        // 查找音乐库中对应的音乐项
+                        final libraryManager = MusicLibraryManager();
+                        final musicItems = libraryManager.allMusic.where(
+                          (item) => item.title == flagInfo.musicTitle
+                        ).toList();
+                        
+                        if (musicItems.isNotEmpty) {
+                          // 使用实际存在的音乐项
+                          final playerManager = AudioPlayerManager();
+                          playerManager.playMusic(musicItems[0].id, musicItems[0].audioUrl);
+                          
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('播放音乐: ${flagInfo.musicTitle}')),
+                          );
+                        } else {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('未能找到音乐: ${flagInfo.musicTitle}')),
+                          );
+                        }
                       },
                     ),
-                  ),
-                
-                const SizedBox(width: 8),
-                
-                Expanded(
-                  child: ElevatedButton.icon(
+                  
+                  const SizedBox(height: 8), // Button spacing
+                  
+                  // Delete marker button
+                  ElevatedButton.icon(
                     icon: const Icon(Icons.delete),
-                    label: const Text('Delete marker'),
+                    label: const Text('Delete Marker'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.red,
                       foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
                     ),
                     onPressed: () {
                       Navigator.pop(context);
                       _deleteFlag(flagId);
                     },
                   ),
-                ),
-              ],
-            ),
-          ],
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );

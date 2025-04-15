@@ -173,9 +173,11 @@ class FlutterMapService extends ChangeNotifier {
         return;
       }
       
-      // Try to use the controller directly, without checking the state property
+      // 添加安全检查以避免使用已销毁的控制器
       try {
-        // If the controller is not ready, this will throw an exception, which will be caught below
+        // 检查地图控制器是否仍然有效
+        var testPoint = _mapController!.center; // 尝试访问属性以验证控制器状态
+        
         _mapController!.move(
           LatLng(_currentLocation!.latitude!, _currentLocation!.longitude!),
           COUNTRY_ZOOM_LEVEL
@@ -183,6 +185,7 @@ class FlutterMapService extends ChangeNotifier {
         print("Successfully moved map to current location");
       } catch (e) {
         print("Failed to move map: $e");
+        // 不要在此处重新抛出异常，而是优雅地处理错误
       }
     } catch (e) {
       print("Error moving to current location: $e");
