@@ -2,6 +2,7 @@ import 'package:just_audio/just_audio.dart';
 import 'package:flutter/foundation.dart';
 import 'dart:async';
 import 'dart:developer' as developer;
+import '../models/music_item.dart';
 
 class AudioPlayerManager extends ChangeNotifier {
   // Singleton instance
@@ -11,114 +12,152 @@ class AudioPlayerManager extends ChangeNotifier {
   factory AudioPlayerManager() => _instance;
   
   // Audio player
-  final AudioPlayer _audioPlayer = AudioPlayer();
+  final AudioPlayer _player = AudioPlayer();
   
   // Current playing music ID
   String? _currentMusicId;
   
-  // Whether it is playing
-  bool _isPlaying = false;
+  // Storage current music information
+  MusicItem? _currentMusic;
   
   // Internal constructor
   AudioPlayerManager._internal() {
     // Initialize the player state listener
-    _audioPlayer.playerStateStream.listen((state) {
-      final bool wasPlaying = _isPlaying;
-      _isPlaying = state.playing;
+    _player.playerStateStream.listen((state) {
+      print("Playback State Changed: Playing=${state.playing}, Processing=${state.processingState}");
       
-      // If the playback state changes, notify the listener
-      if (wasPlaying != _isPlaying) {
-        notifyListeners();
-      }
+      // When playback state changes, notify listeners
+      notifyListeners();
       
-      // If the playback ends, clear the current music ID
+      // If playback ends, clear current music ID
       if (state.processingState == ProcessingState.completed) {
         _currentMusicId = null;
         notifyListeners();
       }
+    });
+    
+    // Add position listener to ensure UI slider updates
+    _player.positionStream.listen((_) {
+      // Only notify listeners, do not modify state
+      // This ensures the UI updates with the playback progress
+      notifyListeners();
     });
   }
   
   // Get the current playing music ID
   String? get currentMusicId => _currentMusicId;
   
-  // Whether it is playing
-  bool get isPlaying => _isPlaying;
+  // Whether it is playing - directly use player state
+  bool get isPlaying => _player.playing;
+  
+  // Get current music
+  MusicItem? get currentMusic => _currentMusic;
   
   // Play music
-  Future<void> playMusic(String musicId, String audioUrl) async {
+  Future<void> playMusic(String musicId, String audioUrl, {MusicItem? musicItem}) async {
     try {
+      print('Start playing music: $musicId');
+      
+      // Save music item information
+      if (musicItem != null) {
+        _currentMusic = musicItem;
+      }
+      
       // If the same song is already playing, return directly
-      if (_currentMusicId == musicId && _isPlaying) {
+      if (_currentMusicId == musicId && _player.playing) {
+        print('Same music is already playing, no need to repeat');
         return;
       }
       
-      // If another song is playing, stop it first
-      if (_isPlaying) {
-        await _audioPlayer.stop();
-      }
-      
-      // Record logs
-      developer.log('Start playing music: $musicId', name: 'AudioPlayerManager');
-      developer.log('Audio URL: $audioUrl', name: 'AudioPlayerManager');
-      
-      // Set the current music ID
+      // Set current music ID (before playback operation)
       _currentMusicId = musicId;
       
-      // Try to set the audio source and play
-      await _audioPlayer.setUrl(audioUrl);
-      await _audioPlayer.play();
-      
-      // Notify the listener
+      // Notify listeners before playback to update UI
+      print('Before playback update state: ID=$musicId');
       notifyListeners();
-    } catch (e, stackTrace) {
-      developer.log('Failed to play music: $e', error: e, stackTrace: stackTrace, name: 'AudioPlayerManager');
-      rethrow; // Rethrow the exception, let the caller handle it
+      
+      // If another song is playing, stop it first
+      if (_player.playing) {
+        await _player.stop();
+      }
+      
+      // Try to set the audio source and play
+      print('Set audio URL and play');
+      await _player.setUrl(audioUrl);
+      await _player.play();
+      
+      // Notify listeners after playback to update UI
+      print('After playback update state: Playing=${_player.playing}, ID=$_currentMusicId');
+      notifyListeners();
+    } catch (e) {
+      print('Failed to play music: $e');
+      notifyListeners();
+      rethrow;
     }
   }
   
   // Pause playback
   Future<void> pauseMusic() async {
-    if (_isPlaying) {
-      await _audioPlayer.pause();
+    print('Attempting to pause music: Current state=${_player.playing}');
+    if (_player.playing) {
+      await _player.pause();
+      print('Music paused: State=${_player.playing}');
       notifyListeners();
     }
   }
   
   // Resume playback
   Future<void> resumeMusic() async {
-    if (!_isPlaying && _currentMusicId != null) {
-      await _audioPlayer.play();
+    try {
+      print('Attempting to resume playback: Current state=${_player.playing}, musicId=$_currentMusicId');
+      if (_currentMusicId != null && !_player.playing) {
+        await _player.play();
+        print('Music resumed: State=${_player.playing}');
+        notifyListeners();
+      }
+    } catch (e) {
+      print('Error resuming playback: $e');
       notifyListeners();
     }
   }
   
   // Stop playback
   Future<void> stopMusic() async {
-    await _audioPlayer.stop();
+    await _player.stop();
     _currentMusicId = null;
     notifyListeners();
+    print('Stopped playing music');
   }
   
   // Seek to a specific position
   Future<void> seekTo(Duration position) async {
-    await _audioPlayer.seek(position);
+    await _player.seek(position);
+    notifyListeners();
   }
   
   // Get the current playback position
-  Stream<Duration> get positionStream => _audioPlayer.positionStream;
+  Stream<Duration> get positionStream => _player.positionStream;
   
   // Get the total duration of the audio
-  Duration? get duration => _audioPlayer.duration;
+  Duration? get duration => _player.duration;
+  
+  // Add this getter to directly access player state
+  Stream<PlayerState> get playerStateStream => _player.playerStateStream;
+  
+  // Get the current position
+  Duration get position => _player.position;
   
   // Clean up resources
   void dispose() {
-    _audioPlayer.dispose();
+    _player.dispose();
     super.dispose();
   }
   
-  // Add this public method
+  // Public method to dispose player
   void disposePlayer() {
-    _audioPlayer.dispose();
+    _player.dispose();
   }
+  
+  // Add this getter to expose the audioPlayer
+  AudioPlayer get audioPlayer => _player;
 } 

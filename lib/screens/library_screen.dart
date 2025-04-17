@@ -8,6 +8,8 @@ import 'package:http/http.dart' as http;
 import 'package:flutter/services.dart';
 import '../services/audio_player_manager.dart';
 import 'dart:async'; // Add timer support
+import '../widgets/audio_visualizer.dart';
+import '../widgets/music_player_card.dart';
 
 // Define the sort option enum
 enum SortOption {
@@ -40,31 +42,32 @@ class _LibraryScreenState extends State<LibraryScreen> {
   String _searchQuery = '';
   Timer? _searchDebounce; // For implementing search throttling
   
+  // Add new state variable
+  bool _showMusicPlayer = false;
+  
   @override
   void initState() {
     super.initState();
     _loadLibrary();
     
-    // Listen to the audio playback state change
+    // 确保添加了正确的监听器
     _audioPlayerManager.addListener(_onAudioPlayerChanged);
-    
-    // Listen to the music library update
     _libraryManager.addListener(_refreshLibrary);
     
-    // Set the text input listener correctly
-    _searchController.addListener(() {
-      _onSearchChanged();
-    });
+    print("LibraryScreen: Initialization completed");
+    
+    // 设置文本输入监听器
+    _searchController.addListener(_onSearchChanged);
   }
   
   @override
   void dispose() {
-    // Remove the listener
+    print("LibraryScreen: Destruction");
+    
+    // Remove listeners
     _audioPlayerManager.removeListener(_onAudioPlayerChanged);
     _libraryManager.removeListener(_refreshLibrary);
-    _searchController.removeListener(() {
-      _onSearchChanged();
-    });
+    _searchController.removeListener(_onSearchChanged);
     
     // Release resources
     _searchController.dispose();
@@ -76,7 +79,13 @@ class _LibraryScreenState extends State<LibraryScreen> {
   
   void _onAudioPlayerChanged() {
     if (mounted) {
-      setState(() {});
+      setState(() {
+        // When the playback state changes, automatically show the player
+        if (_audioPlayerManager.isPlaying && !_showMusicPlayer) {
+          _showMusicPlayer = true;
+        }
+      });
+      print("LibraryScreen: Playback state updated: Playing=${_audioPlayerManager.isPlaying}, Music ID=${_audioPlayerManager.currentMusicId}");
     }
   }
   
@@ -227,7 +236,8 @@ class _LibraryScreenState extends State<LibraryScreen> {
   // Play music
   Future<void> _playMusic(MusicItem music) async {
     try {
-      await _audioPlayerManager.playMusic(music.id, music.audioUrl);
+      // Pass the complete music item
+      await _audioPlayerManager.playMusic(music.id, music.audioUrl, musicItem: music);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

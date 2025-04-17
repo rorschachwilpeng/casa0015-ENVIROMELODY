@@ -6,6 +6,7 @@ import 'screens/profile_screen.dart';
 import 'services/music_library_manager.dart';
 import 'services/audio_player_manager.dart';
 import 'widgets/mini_player.dart';
+import 'widgets/music_visualizer_player.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -90,9 +91,10 @@ class _MainScreenState extends State<MainScreen> {
       bottomNavigationBar: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Mini player
-          const MiniPlayer(),
-          // Bottom navigation bar
+          // 使用我们的音乐可视化播放器代替 MiniPlayer
+          const MusicVisualizerPlayer(),
+          
+          // 底部导航栏
           BottomNavigationBar(
             currentIndex: _currentIndex,
             onTap: (index) {
@@ -100,27 +102,13 @@ class _MainScreenState extends State<MainScreen> {
                 _currentIndex = index;
               });
             },
-            // Set background color
             backgroundColor: Colors.black,
-            
-            // Set selected item color
             selectedItemColor: Colors.blue,
-            
-            // Set unselected item color
             unselectedItemColor: Colors.grey,
-            
-            // Set selected item icon color
             selectedIconTheme: const IconThemeData(color: Colors.blue),
-            
-            // Set unselected item icon color
             unselectedIconTheme: const IconThemeData(color: Colors.grey),
-            
-            // Set selected item text style
             selectedLabelStyle: const TextStyle(fontWeight: FontWeight.bold),
-            
-            // Set unselected item text style
             unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.normal),
-            
             items: const [
               BottomNavigationBarItem(
                 icon: Icon(Icons.home),

@@ -158,37 +158,37 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      // 当应用程序从后台恢复时
+      // When the application resumes from the background
       if (_hasInitializedOnce) {
-        // 如果之前已经初始化过，则仅重新创建控制器但不移至当前位置
+        // If it has been initialized before, only recreate the controller but do not move to the current location
         _mapController = MapController();
         _initMapService();
         
-        // 在下一帧绘制后，恢复地图位置和缩放级别
+        // After the next frame is drawn, restore the map position and zoom level
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (_isMapReady) {
             try {
               _mapController.move(_lastMapCenter, _lastMapZoom);
-              // 重新加载所有标记
+              // Reload all markers
               _loadPersistentFlags();
             } catch (e) {
-              print('恢复地图位置时出错: $e');
+              print('Error restoring map position: $e');
             }
           }
         });
       } else {
-        // 如果是第一次初始化，允许定位到当前位置
+        // If it is the first initialization, allow positioning to the current location
         _mapController = MapController();
         _initMapService();
         _hasInitializedOnce = true;
       }
     } else if (state == AppLifecycleState.paused) {
-      // 当应用程序进入后台时，保存当前地图状态
+      // When the application enters the background, save the current map state
       try {
         _lastMapCenter = _mapController.center;
         _lastMapZoom = _mapController.zoom;
       } catch (e) {
-        print('保存地图状态时出错: $e');
+        print('Error saving map state: $e');
       }
     }
   }
@@ -320,7 +320,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('获取天气数据失败')),
+          const SnackBar(content: Text('Failed to get weather data')),
         );
       }
     } finally {
@@ -517,7 +517,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         child: Icon(
           Icons.flag,
           color: Colors.red,
-          size: 15.0, // 使用固定大小
+          size: 15.0, 
         ),
       ),
       onTap: () {
@@ -550,7 +550,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       child: Icon(
         Icons.flag,
         color: Colors.red,
-        size: 15.0, // 使用固定尺寸
+        size: 15.0, 
       ),
     );
   }
