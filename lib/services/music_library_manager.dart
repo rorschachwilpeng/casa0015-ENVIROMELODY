@@ -174,4 +174,28 @@ class MusicLibraryManager extends ChangeNotifier {
       notifyListeners();
     }
   }
+  
+  // Delete multiple music
+  Future<int> removeMultipleMusic(List<String> ids) async {
+    int removedCount = 0;
+    
+    // Remove music with specified IDs
+    for (String id in ids) {
+      final previousLength = _musicLibrary.length;
+      _musicLibrary.removeWhere((music) => music.id == id);
+      
+      // Check if removal is successful
+      if (previousLength > _musicLibrary.length) {
+        removedCount++;
+      }
+    }
+    
+    if (removedCount > 0) {
+      await saveToStorage();
+      debugPrint('Removed $removedCount music items from library');
+      notifyListeners();
+    }
+    
+    return removedCount;
+  }
 } 

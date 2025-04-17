@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../utils/deepseek_test.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({Key? key}) : super(key: key);
@@ -75,6 +76,14 @@ class ProfileScreen extends StatelessWidget {
               title: const Text('Settings'),
               onTap: () {
                 // TODO: Navigate to settings page
+              },
+            ),
+            const Divider(),
+            ListTile(
+              leading: const Icon(Icons.cloud),
+              title: const Text('测试 DeepSeek API'),
+              onTap: () {
+                testDeepSeekApi(context);
               },
             ),
             const Divider(),

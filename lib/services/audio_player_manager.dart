@@ -20,11 +20,29 @@ class AudioPlayerManager extends ChangeNotifier {
   // Storage current music information
   MusicItem? _currentMusic;
   
+  // 播放列表
+  List<MusicItem> _playlist = [];
+  
+  // 当前播放索引
+  int _currentIndex = -1;
+  
+  // 获取当前播放列表
+  List<MusicItem> get playlist => List.unmodifiable(_playlist);
+  
+  // 获取当前播放索引
+  int get currentIndex => _currentIndex;
+  
+  // 判断是否有下一首歌曲
+  bool get hasNext => _playlist.isNotEmpty && _currentIndex < _playlist.length - 1;
+  
+  // 判断是否有上一首歌曲
+  bool get hasPrevious => _playlist.isNotEmpty && _currentIndex > 0;
+  
   // Internal constructor
   AudioPlayerManager._internal() {
     // Initialize the player state listener
     _player.playerStateStream.listen((state) {
-      print("Playback State Changed: Playing=${state.playing}, Processing=${state.processingState}");
+      //print("Playback State Changed: Playing=${state.playing}, Processing=${state.processingState}");
       
       // When playback state changes, notify listeners
       notifyListeners();
@@ -56,24 +74,31 @@ class AudioPlayerManager extends ChangeNotifier {
   // Play music
   Future<void> playMusic(String musicId, String audioUrl, {MusicItem? musicItem}) async {
     try {
-      print('Start playing music: $musicId');
-      
       // Save music item information
       if (musicItem != null) {
         _currentMusic = musicItem;
+        
+        // Update playlist and current index
+        int existingIndex = _playlist.indexWhere((item) => item.id == musicId);
+        if (existingIndex >= 0) {
+          // If song is already in the playlist, set current index directly
+          _currentIndex = existingIndex;
+        } else {
+          // Otherwise, add to playlist and set it as the current song
+          _playlist.add(musicItem);
+          _currentIndex = _playlist.length - 1;
+        }
       }
       
-      // If the same song is already playing, return directly
+      // If the same song is already playing, return
       if (_currentMusicId == musicId && _player.playing) {
-        print('Same music is already playing, no need to repeat');
         return;
       }
       
-      // Set current music ID (before playback operation)
+      // Set current music ID (before playing operation)
       _currentMusicId = musicId;
       
-      // Notify listeners before playback to update UI
-      print('Before playback update state: ID=$musicId');
+      // Notify listeners before playing to update UI
       notifyListeners();
       
       // If another song is playing, stop it first
@@ -81,16 +106,14 @@ class AudioPlayerManager extends ChangeNotifier {
         await _player.stop();
       }
       
-      // Try to set the audio source and play
-      print('Set audio URL and play');
+      // Try to set audio source and play
       await _player.setUrl(audioUrl);
       await _player.play();
       
-      // Notify listeners after playback to update UI
-      print('After playback update state: Playing=${_player.playing}, ID=$_currentMusicId');
+      // Notify listeners after playing to update UI
       notifyListeners();
     } catch (e) {
-      print('Failed to play music: $e');
+      print('Play music failed: $e');
       notifyListeners();
       rethrow;
     }
@@ -98,10 +121,8 @@ class AudioPlayerManager extends ChangeNotifier {
   
   // Pause playback
   Future<void> pauseMusic() async {
-    print('Attempting to pause music: Current state=${_player.playing}');
     if (_player.playing) {
       await _player.pause();
-      print('Music paused: State=${_player.playing}');
       notifyListeners();
     }
   }
@@ -109,14 +130,12 @@ class AudioPlayerManager extends ChangeNotifier {
   // Resume playback
   Future<void> resumeMusic() async {
     try {
-      print('Attempting to resume playback: Current state=${_player.playing}, musicId=$_currentMusicId');
       if (_currentMusicId != null && !_player.playing) {
         await _player.play();
-        print('Music resumed: State=${_player.playing}');
         notifyListeners();
       }
     } catch (e) {
-      print('Error resuming playback: $e');
+      print('Resume playback failed: $e');
       notifyListeners();
     }
   }
@@ -126,28 +145,78 @@ class AudioPlayerManager extends ChangeNotifier {
     await _player.stop();
     _currentMusicId = null;
     notifyListeners();
-    print('Stopped playing music');
   }
   
-  // Seek to a specific position
+  // Play next song
+  Future<bool> playNext() async {
+    if (!hasNext) return false;
+    
+    try {
+      // Move to next index
+      _currentIndex++;
+      MusicItem nextMusic = _playlist[_currentIndex];
+      
+      // Play next song
+      await playMusic(nextMusic.id, nextMusic.audioUrl, musicItem: nextMusic);
+      return true;
+    } catch (e) {
+      print('Play next failed: $e');
+      return false;
+    }
+  }
+  
+  // Play previous song
+  Future<bool> playPrevious() async {
+    if (!hasPrevious) return false;
+    
+    try {
+      // Move to previous index
+      _currentIndex--;
+      MusicItem prevMusic = _playlist[_currentIndex];
+      
+      // Play previous song
+      await playMusic(prevMusic.id, prevMusic.audioUrl, musicItem: prevMusic);
+      return true;
+    } catch (e) {
+      print('Play previous failed: $e');
+      return false;
+    }
+  }
+  
+  // Set playlist
+  void setPlaylist(List<MusicItem> songs, {int initialIndex = 0}) {
+    if (songs.isEmpty) return;
+    
+    _playlist = List.from(songs);
+    _currentIndex = initialIndex.clamp(0, _playlist.length - 1);
+    
+    // If initial index is provided, immediately play that song
+    if (_playlist.isNotEmpty) {
+      final initialSong = _playlist[_currentIndex];
+      playMusic(initialSong.id, initialSong.audioUrl, musicItem: initialSong);
+    }
+  }
+  
+  // Seek to specific position
   Future<void> seekTo(Duration position) async {
     await _player.seek(position);
     notifyListeners();
   }
   
-  // Get the current playback position
+  // Get current playback position
   Stream<Duration> get positionStream => _player.positionStream;
   
-  // Get the total duration of the audio
+  // Get audio total duration
   Duration? get duration => _player.duration;
   
-  // Add this getter to directly access player state
+  // Add this getter to expose the audioPlayer
   Stream<PlayerState> get playerStateStream => _player.playerStateStream;
   
-  // Get the current position
+  // Get current position
   Duration get position => _player.position;
   
   // Clean up resources
+  @override
   void dispose() {
     _player.dispose();
     super.dispose();

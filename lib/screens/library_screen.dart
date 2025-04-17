@@ -10,6 +10,7 @@ import '../services/audio_player_manager.dart';
 import 'dart:async'; // Add timer support
 import '../widgets/audio_visualizer.dart';
 import '../widgets/music_player_card.dart';
+import '../services/playlist_manager.dart';
 
 // Define the sort option enum
 enum SortOption {
@@ -28,6 +29,7 @@ class LibraryScreen extends StatefulWidget {
 class _LibraryScreenState extends State<LibraryScreen> {
   final MusicLibraryManager _libraryManager = MusicLibraryManager();
   final AudioPlayerManager _audioPlayerManager = AudioPlayerManager();
+  final PlaylistManager _playlistManager = PlaylistManager();
   
   bool _isLoading = true;
   
@@ -44,6 +46,10 @@ class _LibraryScreenState extends State<LibraryScreen> {
   
   // Add new state variable
   bool _showMusicPlayer = false;
+  
+  // 多选相关状态变量
+  bool _isMultiSelectMode = false;
+  Set<String> _selectedMusicIds = <String>{};
   
   @override
   void initState() {
@@ -85,7 +91,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
           _showMusicPlayer = true;
         }
       });
-      print("LibraryScreen: Playback state updated: Playing=${_audioPlayerManager.isPlaying}, Music ID=${_audioPlayerManager.currentMusicId}");
+      //print("LibraryScreen: Playback state updated: Playing=${_audioPlayerManager.isPlaying}, Music ID=${_audioPlayerManager.currentMusicId}");
     }
   }
   
@@ -236,12 +242,25 @@ class _LibraryScreenState extends State<LibraryScreen> {
   // Play music
   Future<void> _playMusic(MusicItem music) async {
     try {
-      // Pass the complete music item
-      await _audioPlayerManager.playMusic(music.id, music.audioUrl, musicItem: music);
+      // 获取当前所有音乐列表
+      final List<MusicItem> allMusic = _filteredMusicList;
+      
+      // 找到当前选择的音乐在列表中的索引
+      final int currentIndex = allMusic.indexWhere((item) => item.id == music.id);
+      
+      // 设置播放列表，并从当前选择的歌曲开始播放
+      _playlistManager.setPlaylist(allMusic, initialIndex: currentIndex > -1 ? currentIndex : 0);
+      
+      // 如果播放器不可见，则显示它
+      if (!_showMusicPlayer) {
+        setState(() {
+          _showMusicPlayer = true;
+        });
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to play music: ${e.toString()}')),
+          SnackBar(content: Text('播放音乐失败: ${e.toString()}')),
         );
       }
     }
@@ -353,22 +372,56 @@ class _LibraryScreenState extends State<LibraryScreen> {
       appBar: AppBar(
         title: _isSearching 
             ? _buildSearchBar() 
-            : const Text('My music library'),
+            : Text(_isMultiSelectMode 
+                ? 'Selected ${_selectedMusicIds.length} items' 
+                : 'My music library'),
         actions: [
-          // When not in search mode, display the search button
-          if (!_isSearching)
+          // Display the multi-select button (when not in search mode and not in multi-select mode)
+          if (!_isSearching && !_isMultiSelectMode)
+            IconButton(
+              icon: const Icon(Icons.select_all),
+              onPressed: _toggleMultiSelectMode,
+              tooltip: 'Multi-select mode',
+            ),
+          
+          // When not in multi-select mode, display the search button
+          if (!_isSearching && !_isMultiSelectMode)
             IconButton(
               icon: const Icon(Icons.search),
               onPressed: _toggleSearch,
-              tooltip: '搜索',
+              tooltip: 'Search',
             ),
-          
-          // When not in search mode, display the refresh button
-          if (!_isSearching)
+        
+          // When not in multi-select mode and not in search mode, display the refresh button
+          if (!_isSearching && !_isMultiSelectMode)
             IconButton(
               icon: const Icon(Icons.refresh),
               onPressed: _loadLibrary,
               tooltip: 'Refresh',
+            ),
+        
+          // When in multi-select mode, display the select/deselect all button
+          if (_isMultiSelectMode)
+            IconButton(
+              icon: Icon(
+                _selectedMusicIds.length == musicList.length 
+                    ? Icons.deselect
+                    : Icons.select_all,
+              ),
+              onPressed: () {
+                setState(() {
+                  if (_selectedMusicIds.length == musicList.length) {
+                    // Deselect all
+                    _selectedMusicIds.clear();
+                  } else {
+                    // Select all
+                    _selectedMusicIds = musicList.map((music) => music.id).toSet();
+                  }
+                });
+              },
+              tooltip: _selectedMusicIds.length == musicList.length 
+                  ? 'Deselect all' 
+                  : 'Select all',
             ),
         ],
         // When in search mode, adjust titleSpacing
@@ -379,229 +432,85 @@ class _LibraryScreenState extends State<LibraryScreen> {
                 icon: const Icon(Icons.arrow_back),
                 onPressed: _toggleSearch,
               )
-            : null,
+            : (_isMultiSelectMode 
+                ? IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: _toggleMultiSelectMode,
+                  )
+                : null),
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : Column(
-              children: [
-                // Only display the sort control when not in search mode
-                if (!_isSearching)
-                  Padding(
-                    padding: const EdgeInsets.all(8.0),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        Text('Sorting method: ', style: TextStyle(color: Colors.grey[600])),
-                        DropdownButton<SortOption>(
-                          value: _currentSortOption,
-                          underline: Container(height: 1, color: Colors.grey[300]),
-                          icon: const Icon(Icons.arrow_drop_down),
-                          items: SortOption.values.map((option) {
-                            return DropdownMenuItem(
-                              value: option,
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(
-                                    option == SortOption.newest || option == SortOption.oldest 
-                                        ? Icons.access_time 
-                                        : Icons.timer,
-                                    size: 16,
-                                    color: Colors.grey[600],
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Text(_getSortOptionLabel(option)),
-                                ],
-                              ),
-                            );
-                          }).toList(),
-                          onChanged: (option) {
-                            if (option != null) {
-                              _changeSortOption(option);
-                            }
-                          },
-                        ),
-                      ],
-                    ),
-                  ),
-                
-                // Display the current search status information
-                if (_isSearching && _searchQuery.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            'Search results: "${_searchQuery}" ${musicList.isEmpty ? "(No matching items)" : "(${musicList.length} items)"}',
-                            style: TextStyle(
-                              color: Colors.grey[600],
-                              fontStyle: FontStyle.italic,
-                            ),
-                          ),
-                        ),
-                        if (_searchQuery.isNotEmpty)
-                          TextButton.icon(
-                            icon: const Icon(Icons.clear, size: 16),
-                            label: const Text('Clear'),
-                            onPressed: _clearSearch,
-                            style: TextButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(horizontal: 8),
-                              minimumSize: const Size(50, 30),
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                
-                // Main content area
-                Expanded(
-                  child: musicList.isEmpty && !_searchQuery.isNotEmpty
-                      ? _buildEmptyView() // Empty library view
-                      : noSearchResults
-                          ? _buildEmptySearchResultView() // Empty search result view
-                          : RefreshIndicator(
-                              onRefresh: _loadLibrary,
-                              child: ListView.builder(
-                                itemCount: musicList.length,
-                                itemBuilder: (context, index) {
-                                  final music = musicList[index];
-                                  final bool isPlaying = _audioPlayerManager.currentMusicId == music.id && 
-                                                      _audioPlayerManager.isPlaying;
-                                  
-                                  return Dismissible(
-                                    key: Key(music.id),
-                                    background: Container(
-                                      color: Colors.red,
-                                      alignment: Alignment.centerRight,
-                                      padding: const EdgeInsets.only(right: 16.0),
-                                      child: const Icon(Icons.delete, color: Colors.white),
-                                    ),
-                                    direction: DismissDirection.endToStart,
-                                    confirmDismiss: (direction) async {
-                                      return await showDialog<bool>(
-                                        context: context,
-                                        builder: (context) => AlertDialog(
-                                          title: const Text('Confirm deletion'),
-                                          content: const Text('Are you sure you want to delete this music?'),
-                                          actions: [
-                                            TextButton(
-                                              onPressed: () => Navigator.of(context).pop(false),
-                                              child: const Text('Cancel'),
-                                            ),
-                                            TextButton(
-                                              onPressed: () => Navigator.of(context).pop(true),
-                                              child: const Text('Delete'),
-                                            ),
-                                          ],
-                                        ),
-                                      );
-                                    },
-                                    onDismissed: (direction) => _deleteMusic(music.id),
-                                    child: ListTile(
-                                      leading: CircleAvatar(
-                                        backgroundColor: Theme.of(context).primaryColor.withOpacity(0.1),
-                                        child: const Icon(Icons.music_note),
-                                      ),
-                                      title: _searchQuery.isEmpty
-                                          ? Text(
-                                              music.title.isEmpty ? 'Untitled Music' : music.title,
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                            )
-                                          : _highlightText(
-                                              music.title.isEmpty ? 'Untitled Music' : music.title,
-                                              _searchQuery,
-                                            ),
-                                      subtitle: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          _searchQuery.isEmpty
-                                              ? Text(
-                                                  music.prompt.isEmpty ? 'No prompt' : music.prompt,
-                                                  maxLines: 1,
-                                                  overflow: TextOverflow.ellipsis,
-                                                )
-                                              : _highlightText(
-                                                  music.prompt.isEmpty ? 'No prompt' : music.prompt,
-                                                  _searchQuery,
-                                                ),
-                                          Text(
-                                            music.createdAt.toString().substring(0, 16),
-                                            style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                                          ),
-                                        ],
-                                      ),
-                                      trailing: IconButton(
-                                        icon: Icon(
-                                          isPlaying ? Icons.pause : Icons.play_arrow,
-                                          color: isPlaying ? Colors.blue : null,
-                                        ),
-                                        onPressed: () {
-                                          if (isPlaying) {
-                                            _pauseMusic();
-                                          } else {
-                                            _playMusic(music);
-                                          }
-                                        },
-                                      ),
-                                      onTap: () {
-                                        // You can navigate to the details page
+      body: Column(
+        children: [
+          Expanded(
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : Column(
+                    children: [
+                      // Only display the sort control when not in search mode and not in multi-select mode
+                      if (!_isSearching && !_isMultiSelectMode)
+                        _buildSortControls(),
+                      
+                      // Display the current search status information
+                      if (_isSearching && _searchQuery.isNotEmpty)
+                        _buildSearchStatusBar(),
+                      
+                      // Main content area
+                      Expanded(
+                        child: musicList.isEmpty && !_searchQuery.isNotEmpty
+                            ? _buildEmptyView() // Empty library view
+                            : noSearchResults
+                                ? _buildEmptySearchResultView() // Empty search result view
+                                : RefreshIndicator(
+                                    onRefresh: _loadLibrary,
+                                    child: ListView.builder(
+                                      itemCount: musicList.length,
+                                      itemBuilder: (context, index) {
+                                        final music = musicList[index];
+                                        final bool isPlaying = _audioPlayerManager.currentMusicId == music.id && 
+                                                            _audioPlayerManager.isPlaying;
+                                        final bool isSelected = _selectedMusicIds.contains(music.id);
+                                        
+                                        return _isMultiSelectMode
+                                            ? _buildMultiSelectListItem(music, isPlaying, isSelected)
+                                            : _buildRegularListItem(music, isPlaying, index);
                                       },
-                                      onLongPress: () => _showMusicOptions(music),
                                     ),
-                                  );
-                                },
-                              ),
-                            ),
+                                  ),
+                      ),
+                    ],
+                  ),
+          ),
+          
+          // 如果当前有音乐在播放，显示音乐播放器卡片
+          if (_audioPlayerManager.currentMusic != null)
+            _buildMusicPlayer(),
+        ],
+      ),
+      // Bottom delete button (displayed when in multi-select mode and there are selected items)
+      bottomNavigationBar: _isMultiSelectMode && _selectedMusicIds.isNotEmpty
+          ? BottomAppBar(
+              color: Colors.red,
+              child: InkWell(
+                onTap: _deleteSelectedMusic,
+                child: Container(
+                  height: 56.0,
+                  alignment: Alignment.center,
+                  child: Text(
+                    'Delete selected (${_selectedMusicIds.length})',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
                 ),
-              ],
-            ),
-      // Add the sorting button at the bottom in search mode
+              ),
+            )
+          : null,
+      // Add sort button (when in search mode)
       floatingActionButton: _isSearching
           ? FloatingActionButton(
-              onPressed: () {
-                // Display the sorting option dialog
-                showDialog(
-                  context: context,
-                  builder: (context) => SimpleDialog(
-                    title: const Text('Select sorting method'),
-                    children: SortOption.values.map((option) {
-                      return SimpleDialogOption(
-                        onPressed: () {
-                          Navigator.pop(context);
-                          _changeSortOption(option);
-                        },
-                        child: Row(
-                          children: [
-                            Icon(
-                              option == SortOption.newest || option == SortOption.oldest 
-                                  ? Icons.access_time 
-                                  : Icons.timer,
-                              color: _currentSortOption == option 
-                                  ? Theme.of(context).primaryColor 
-                                  : Colors.grey[600],
-                            ),
-                            const SizedBox(width: 16),
-                            Text(
-                              _getSortOptionLabel(option),
-                              style: TextStyle(
-                                color: _currentSortOption == option 
-                                    ? Theme.of(context).primaryColor 
-                                    : null,
-                                fontWeight: _currentSortOption == option 
-                                    ? FontWeight.bold 
-                                    : FontWeight.normal,
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                    }).toList(),
-                  ),
-                );
-              },
+              onPressed: _showSortOptionsDialog,
               child: const Icon(Icons.sort),
               tooltip: 'Sort',
             )
@@ -885,6 +794,312 @@ class _LibraryScreenState extends State<LibraryScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  // Add multi-select mode toggle method
+  void _toggleMultiSelectMode() {
+    setState(() {
+      _isMultiSelectMode = !_isMultiSelectMode;
+      if (!_isMultiSelectMode) {
+        // When exiting multi-select mode, clear the selected items
+        _selectedMusicIds.clear();
+      }
+    });
+  }
+
+  // Add batch delete method
+  Future<void> _deleteSelectedMusic() async {
+    if (_selectedMusicIds.isEmpty) return;
+    
+    // Show confirmation dialog
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Confirm delete'),
+        content: Text('Are you sure you want to delete the selected ${_selectedMusicIds.length} music files? This action cannot be undone.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    
+    if (confirm == true) {
+      // If the currently playing music is also in the deletion list, stop playing first
+      if (_selectedMusicIds.contains(_audioPlayerManager.currentMusicId) && 
+          _audioPlayerManager.isPlaying) {
+        _audioPlayerManager.stopMusic();
+      }
+      
+      // Execute batch deletion
+      final removedCount = await _libraryManager.removeMultipleMusic(_selectedMusicIds.toList());
+      
+      // Update the interface state
+      setState(() {
+        _selectedMusicIds.clear();
+        _isMultiSelectMode = false;
+      });
+      
+      // Show a prompt
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Deleted $removedCount music files')),
+        );
+      }
+    }
+  }
+
+  // List item for multi-select mode
+  Widget _buildMultiSelectListItem(MusicItem music, bool isPlaying, bool isSelected) {
+    return ListTile(
+      leading: CircleAvatar(
+        backgroundColor: isSelected
+            ? Colors.blue.withOpacity(0.3)
+            : Theme.of(context).primaryColor.withOpacity(0.1),
+        child: isSelected
+            ? const Icon(Icons.check, color: Colors.blue)
+            : const Icon(Icons.music_note),
+      ),
+      title: Text(
+        music.title.isEmpty ? 'Untitled Music' : music.title,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
+      subtitle: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            music.prompt.isEmpty ? 'No prompt' : music.prompt,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          Text(
+            music.createdAt.toString().substring(0, 16),
+            style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+          ),
+        ],
+      ),
+      trailing: Checkbox(
+        value: isSelected,
+        onChanged: (value) {
+          setState(() {
+            if (value == true) {
+              _selectedMusicIds.add(music.id);
+            } else {
+              _selectedMusicIds.remove(music.id);
+            }
+          });
+        },
+      ),
+      onTap: () {
+        setState(() {
+          if (_selectedMusicIds.contains(music.id)) {
+            _selectedMusicIds.remove(music.id);
+          } else {
+            _selectedMusicIds.add(music.id);
+          }
+        });
+      },
+    );
+  }
+
+  // List item for regular mode
+  Widget _buildRegularListItem(MusicItem music, bool isPlaying, int index) {
+    return Dismissible(
+      key: Key(music.id),
+      background: Container(
+        color: Colors.red,
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: 16.0),
+        child: const Icon(Icons.delete, color: Colors.white),
+      ),
+      direction: DismissDirection.endToStart,
+      confirmDismiss: (direction) async {
+        return await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Confirm delete'),
+            content: const Text('Are you sure you want to delete this music file?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                child: const Text('Delete'),
+              ),
+            ],
+          ),
+        );
+      },
+      onDismissed: (direction) => _deleteMusic(music.id),
+      child: ListTile(
+        leading: CircleAvatar(
+          backgroundColor: Theme.of(context).primaryColor.withOpacity(0.1),
+          child: const Icon(Icons.music_note),
+        ),
+        title: _searchQuery.isEmpty
+            ? Text(
+                music.title.isEmpty ? 'Untitled Music' : music.title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              )
+            : _highlightText(
+                music.title.isEmpty ? 'Untitled Music' : music.title,
+                _searchQuery,
+              ),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _searchQuery.isEmpty
+                ? Text(
+                    music.prompt.isEmpty ? 'No prompt' : music.prompt,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  )
+                : _highlightText(
+                    music.prompt.isEmpty ? 'No prompt' : music.prompt,
+                    _searchQuery,
+                  ),
+            Text(
+              music.createdAt.toString().substring(0, 16),
+              style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+            ),
+          ],
+        ),
+        trailing: IconButton(
+          icon: Icon(
+            isPlaying ? Icons.pause : Icons.play_arrow,
+            color: isPlaying ? Colors.blue : null,
+          ),
+          onPressed: () {
+            if (isPlaying) {
+              _pauseMusic();
+            } else {
+              _playMusic(music);
+            }
+          },
+        ),
+        onTap: () {
+          // 可以导航到详情页
+        },
+        onLongPress: () => _showMusicOptions(music),
+      ),
+    );
+  }
+
+  // Add or modify search status bar build method
+  Widget _buildSearchStatusBar() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              'Search results: "${_searchQuery}" ${_filteredMusicList.isEmpty ? "(No matches)" : "(${_filteredMusicList.length} items)"}',
+              style: TextStyle(
+                color: Colors.grey[600],
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+          ),
+          if (_searchQuery.isNotEmpty)
+            TextButton.icon(
+              icon: const Icon(Icons.clear, size: 16),
+              label: const Text('Clear'),
+              onPressed: _clearSearch,
+              style: TextButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                minimumSize: const Size(50, 30),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  // Add sort options dialog method
+  void _showSortOptionsDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => SimpleDialog(
+        title: const Text('Select sort option'),
+        children: SortOption.values.map((option) {
+          return SimpleDialogOption(
+            onPressed: () {
+              Navigator.pop(context);
+              _changeSortOption(option);
+            },
+            child: Row(
+              children: [
+                Icon(
+                  option == SortOption.newest || option == SortOption.oldest 
+                      ? Icons.access_time 
+                      : Icons.timer,
+                  color: _currentSortOption == option 
+                      ? Theme.of(context).primaryColor 
+                      : Colors.grey[600],
+                ),
+                const SizedBox(width: 16),
+                Text(
+                  _getSortOptionLabel(option),
+                  style: TextStyle(
+                    color: _currentSortOption == option 
+                        ? Theme.of(context).primaryColor 
+                        : null,
+                    fontWeight: _currentSortOption == option 
+                        ? FontWeight.bold 
+                        : FontWeight.normal,
+                  ),
+                ),
+              ],
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  // 在 LibraryScreen 中添加显示音乐播放器的方法
+  Widget _buildMusicPlayer() {
+    // 确保有当前播放的音乐
+    if (_audioPlayerManager.currentMusic == null) return const SizedBox.shrink();
+    
+    return MusicPlayerCard(
+      musicItem: _audioPlayerManager.currentMusic!,
+      audioPlayer: _audioPlayerManager.audioPlayer,
+      onClose: () {
+        setState(() {
+          _showMusicPlayer = false;
+        });
+        _audioPlayerManager.pauseMusic();
+      },
+      hasPrevious: _playlistManager.hasPrevious,
+      hasNext: _playlistManager.hasNext,
+      onPrevious: () async {
+        bool success = await _playlistManager.playPrevious();
+        if (!success && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('没有上一首歌曲')),
+          );
+        }
+      },
+      onNext: () async {
+        bool success = await _playlistManager.playNext();
+        if (!success && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('没有下一首歌曲')),
+          );
+        }
+      },
     );
   }
 } 

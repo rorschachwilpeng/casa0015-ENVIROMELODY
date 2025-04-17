@@ -7,12 +7,20 @@ class MusicPlayerCard extends StatefulWidget {
   final MusicItem musicItem;
   final AudioPlayer audioPlayer;
   final VoidCallback? onClose;
+  final VoidCallback? onPrevious;
+  final VoidCallback? onNext;
+  final bool hasPrevious;
+  final bool hasNext;
   
   const MusicPlayerCard({
     Key? key,
     required this.musicItem,
     required this.audioPlayer,
     this.onClose,
+    this.onPrevious,
+    this.onNext,
+    this.hasPrevious = false,
+    this.hasNext = false,
   }) : super(key: key);
 
   @override
@@ -129,9 +137,8 @@ class _MusicPlayerCardState extends State<MusicPlayerCard> {
               children: [
                 IconButton(
                   icon: const Icon(Icons.skip_previous),
-                  onPressed: () {
-                    // Play the previous song (add later when implementing the playlist feature)
-                  },
+                  onPressed: widget.hasPrevious ? widget.onPrevious : null,
+                  color: widget.hasPrevious ? Colors.purple : Colors.grey,
                 ),
                 StreamBuilder<PlayerState>(
                   stream: widget.audioPlayer.playerStateStream,
@@ -139,8 +146,6 @@ class _MusicPlayerCardState extends State<MusicPlayerCard> {
                     final playerState = snapshot.data;
                     final processingState = playerState?.processingState;
                     final playing = playerState?.playing;
-                    
-                    print("MusicPlayerCard: 状态=$processingState, 播放=$playing");
                     
                     if (processingState == ProcessingState.loading ||
                         processingState == ProcessingState.buffering) {
@@ -158,9 +163,7 @@ class _MusicPlayerCardState extends State<MusicPlayerCard> {
                         iconSize: 48,
                         color: Colors.purple,
                         onPressed: () {
-                          // Calling play() directly may lead to state synchronization issues
                           widget.audioPlayer.play().then((_) {
-                            // Add debugging logs
                             print("Play button clicked: Starting playback");
                           });
                         },
@@ -171,9 +174,7 @@ class _MusicPlayerCardState extends State<MusicPlayerCard> {
                         iconSize: 48,
                         color: Colors.purple,
                         onPressed: () {
-                          // Calling pause() directly may lead to state synchronization issues
                           widget.audioPlayer.pause().then((_) {
-                            // Add debugging logs
                             print("Pause button clicked: Pausing playback");
                           });
                         },
@@ -183,9 +184,8 @@ class _MusicPlayerCardState extends State<MusicPlayerCard> {
                 ),
                 IconButton(
                   icon: const Icon(Icons.skip_next),
-                  onPressed: () {
-                    // Play the next song (add later when implementing the playlist feature)
-                  },
+                  onPressed: widget.hasNext ? widget.onNext : null,
+                  color: widget.hasNext ? Colors.purple : Colors.grey,
                 ),
               ],
             ),

@@ -23,6 +23,10 @@ class AppConfig {
   static const int defaultAudioDurationSeconds = 20;
   static const String defaultAudioFormat = "mp3";
   
+  // DeepSeek API 配置
+  static const String deepSeekApiKey = "sk-fe8c07ad4d344b65856bb0fe6beed2ac"; // 你的 API 密钥
+  static const String deepSeekApiEndpoint = "https://api.deepseek.com/v1/chat/completions";
+  
   // Other configs...
   
   // Helper method: Validate API key
@@ -52,6 +56,12 @@ class AppConfig {
   // Get full API URL
   static String getStabilityAudioUrl() {
     return "$stabilityApiBaseUrl$stabilityAudioEndpoint";
+  }
+  
+  // Helper method: Validate DeepSeek API key
+  static bool isDeepSeekApiKeyValid() {
+    return deepSeekApiKey.isNotEmpty && 
+           deepSeekApiKey.length > 10;
   }
   
   // Diagnostic information: Display summary of all configurations

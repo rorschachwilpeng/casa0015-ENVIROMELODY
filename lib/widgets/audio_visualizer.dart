@@ -28,7 +28,7 @@ class _AudioVisualizerState extends State<AudioVisualizer> with SingleTickerProv
   void initState() {
     super.initState();
     
-    print("AudioVisualizer: Initialize, Playback State=${widget.audioPlayer.playing}");
+    // print("AudioVisualizer: Initialize, Playback State=${widget.audioPlayer.playing}");
     
     // If already playing, start animation immediately
     if (widget.audioPlayer.playing) {
@@ -39,7 +39,7 @@ class _AudioVisualizerState extends State<AudioVisualizer> with SingleTickerProv
     
     // Listen for playback state changes
     widget.audioPlayer.playerStateStream.listen((state) {
-      print("AudioVisualizer: Playback State Changed ${state.playing}");
+      // print("AudioVisualizer: Playback State Changed ${state.playing}");
       if (state.playing) {
         _startAnimation();
       } else {
@@ -53,7 +53,7 @@ class _AudioVisualizerState extends State<AudioVisualizer> with SingleTickerProv
     _timer?.cancel();
     
     // Check if playing
-    print("AudioVisualizer: Attempting to start animation, Playback State=${widget.audioPlayer.playing}");
+    // print("AudioVisualizer: Attempting to start animation, Playback State=${widget.audioPlayer.playing}");
     
     // If playing, start animation
     if (widget.audioPlayer.playing) {

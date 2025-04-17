@@ -14,6 +14,9 @@ import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'package:flutter/services.dart';
 import '../services/audio_player_manager.dart';
+import '../models/music_preference.dart';
+import '../widgets/music_preference_selector.dart';
+import '../services/deepseek_api_service.dart';  // 添加这一行
 
 // Define FlagInfo class (put at the top of the file, all classes outside)
 class FlagInfo {
@@ -105,6 +108,15 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   double _lastMapZoom = 6.0; // Default zoom level
   bool _hasInitializedOnce = false; // Used to track whether it has been initialized
   
+  // Add these variables in _HomeScreenState class
+  MusicVibe? _selectedVibe;
+  MusicGenre? _selectedGenre;
+  
+  // 在 _HomeScreenState 类中添加 DeepSeekApiService 实例
+  final DeepSeekApiService _deepSeekApiService = DeepSeekApiService(
+    apiKey: AppConfig.deepSeekApiKey,
+  );
+  
   @override
   void initState() {
     super.initState();
@@ -158,18 +170,21 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      // When the application resumes from the background
+      // 当应用从后台恢复时
+      _selectedVibe = null;
+      _selectedGenre = null;
+      
       if (_hasInitializedOnce) {
-        // If it has been initialized before, only recreate the controller but do not move to the current location
+        // 如果之前已经初始化过，只重新创建控制器但不移动到当前位置
         _mapController = MapController();
         _initMapService();
         
-        // After the next frame is drawn, restore the map position and zoom level
+        // 在下一帧绘制后，恢复地图位置和缩放级别
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (_isMapReady) {
             try {
               _mapController.move(_lastMapCenter, _lastMapZoom);
-              // Reload all markers
+              // 重新加载所有标记
               _loadPersistentFlags();
             } catch (e) {
               print('Error restoring map position: $e');
@@ -177,13 +192,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           }
         });
       } else {
-        // If it is the first initialization, allow positioning to the current location
+        // 如果是首次初始化，允许定位到当前位置
         _mapController = MapController();
         _initMapService();
         _hasInitializedOnce = true;
       }
     } else if (state == AppLifecycleState.paused) {
-      // When the application enters the background, save the current map state
+      // 应用进入后台时，保存当前地图状态
       try {
         _lastMapCenter = _mapController.center;
         _lastMapZoom = _mapController.zoom;
@@ -280,7 +295,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
   
   // Get weather data for the clicked location
-  Future<void> _getWeatherForLocation(LatLng location, String flagId) async {
+  Future<void> _getWeatherForLocation(LatLng location, String flagId, [bool addMarker = true]) async {
     if (!_isMapReady) return;
     
     setState(() {
@@ -310,7 +325,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           _flagInfoMap[flagId] = flagInfo;
           
           // Save to persistent service
-          if (flagId.isNotEmpty) {
+          if (addMarker) {
             _mapService.saveFlagInfo(flagId, flagInfo);
           }
         });
@@ -372,7 +387,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     print('Double tapped at: ${location.latitude}, ${location.longitude}');
     
     // Get weather data for the clicked location
-    _getWeatherForLocation(location, '');
+    _getWeatherForLocation(location, '', false);
     
     // Move to the location and slightly zoom in
     _mapController.move(location, _mapController.zoom + 1);
@@ -500,42 +515,18 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   
   // Modify the place flag method
   void _placeFlagAndGetWeather(LatLng location) {
-    print('Place flag at: ${location.latitude}, ${location.longitude}');
+    print('Getting weather at: ${location.latitude}, ${location.longitude}');
     
-    // Generate a unique flag ID
+    // 生成唯一标识符，但不立即添加标记
     String flagId = 'flag_${DateTime.now().millisecondsSinceEpoch}';
     
-    // Add flag marker
-    _mapService.addMarker(
-      id: flagId,
-      position: location,
-      title: '',
-      icon: Container(
-        width: 40,
-        height: 40,
-        alignment: Alignment.center,
-        child: Icon(
-          Icons.flag,
-          color: Colors.red,
-          size: 15.0, 
-        ),
-      ),
-      onTap: () {
-        print('Flag clicked: $flagId');
-        _showFlagInfoWindow(flagId, location);
-      },
-      onLongPress: () {
-        _showDeleteMarkerDialog(flagId);
-      },
-    );
-    
-    // Move to the location
+    // 移动到选定位置
     _safelyMoveMap(location, _mapController.zoom);
     
-    // Get weather data for the location
-    _getWeatherForLocation(location, flagId);
+    // 获取天气数据，但不保存到持久化存储中
+    _getWeatherForLocation(location, flagId, false); // 添加参数表示不添加标记
     
-    // Refresh UI to ensure marker is displayed
+    // 刷新UI以显示天气数据，但不显示标记
     setState(() {});
   }
   
@@ -623,41 +614,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               ),
             ],
           ),
-          
-          if (_isLoadingLocation)
-            Positioned(
-              top: 16,
-              right: 16,
-              child: Container(
-                padding: const EdgeInsets.all(8.0),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(8.0),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.1),
-                      spreadRadius: 1,
-                      blurRadius: 2,
-                      offset: const Offset(0, 1),
-                    ),
-                  ],
-                ),
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                      ),
-                    ),
-                    SizedBox(width: 8),
-                    Text('Locating...', style: TextStyle(fontSize: 12)),
-                  ],
-                ),
-              ),
-            ),
           
           if (_isLoadingWeather)
             Positioned(
@@ -927,7 +883,18 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 icon: const Icon(Icons.music_note),
                 label: const Text('Generate music based on weather'),
                 onPressed: () {
-                  _showGenerateMusicDialog(weatherData, '');
+                  // 创建一个临时标记ID
+                  String tempFlagId = 'flag_temp_${DateTime.now().millisecondsSinceEpoch}';
+                  
+                  // 保存天气信息但不添加标记
+                  _flagInfoMap[tempFlagId] = FlagInfo(
+                    position: LatLng(weatherData.location?.latitude ?? 0, 
+                                    weatherData.location?.longitude ?? 0),
+                    weatherData: weatherData,
+                    createdAt: DateTime.now(),
+                  );
+                  
+                  _showGenerateMusicDialog(weatherData, tempFlagId);
                 },
               ),
             ),
@@ -960,11 +927,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     );
   }
   
+  // 替换原有的 _showGenerateMusicDialog 方法
   void _showGenerateMusicDialog(WeatherData weatherData, String flagId) {
-    final prompt = weatherData.buildMusicPrompt();
-    final TextEditingController promptController = TextEditingController(text: prompt);
+    // Reset selection state each time dialog is opened
+    _selectedVibe = null;
+    _selectedGenre = null;
     
-    // Use Dialog instead of AlertDialog, so we can control the layout more flexibly
+    // Use StatefulBuilder to allow setState inside dialog
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -972,119 +941,204 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         final screenHeight = MediaQuery.of(context).size.height;
         final screenWidth = MediaQuery.of(context).size.width;
         
-        return Dialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          // Set fixed size to avoid auto layout overflow
-          child: Container(
-            width: screenWidth * 0.85,
-            height: screenHeight * 0.5, // Set fixed height to half of the screen
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Title
-                const Text(
-                  'Generate music based on weather',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                
-                // Scrollable content area
-                Expanded(
-                  child: SingleChildScrollView(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return Dialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Container(
+                width: screenWidth * 0.85,
+                height: screenHeight * 0.5,
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Title
+                    Text(
+                      'Generate music for ${weatherData.cityName}\'s ${weatherData.weatherDescription} weather',
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    
+                    // Scrollable content area
+                    Expanded(
+                      child: SingleChildScrollView(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Music preference selector
+                            MusicPreferenceSelector(
+                              initialVibe: _selectedVibe,
+                              initialGenre: _selectedGenre,
+                              onPreferencesChanged: (vibe, genre) {
+                                setState(() {
+                                  _selectedVibe = vibe;
+                                  _selectedGenre = genre;
+                                });
+                              },
+                            ),
+                            
+                            const SizedBox(height: 16),
+                            
+                            // Weather information card
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: Colors.blue.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: Colors.blue.withOpacity(0.3)),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Icon(
+                                        _getWeatherIconForData(weatherData),
+                                        color: _getWeatherColorForData(weatherData),
+                                        size: 24,
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        'Weather: ${weatherData.weatherDescription}',
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text('Temperature: ${weatherData.temperature.toStringAsFixed(1)}°C'),
+                                  Text('Humidity: ${weatherData.humidity}%'),
+                                  Text('Wind Speed: ${weatherData.windSpeed} m/s'),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    
+                    // Button area
+                    const SizedBox(height: 16),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
                       children: [
-                        const Text(
-                          'The music will be generated using the following Prompt:',
-                          style: TextStyle(fontWeight: FontWeight.bold),
+                        TextButton(
+                          onPressed: () {
+                            Navigator.pop(context);
+                          },
+                          child: const Text('Cancel'),
                         ),
-                        const SizedBox(height: 8),
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: Colors.grey[200],
-                            borderRadius: BorderRadius.circular(8),
+                        const SizedBox(width: 8),
+                        ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.deepPurple,
+                            foregroundColor: Colors.white,
                           ),
-                          width: double.infinity,
-                          child: Text(prompt),
-                        ),
-                        const SizedBox(height: 16),
-                        const Text(
-                          'You can modify this Prompt to meet your needs:',
-                          style: TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                        const SizedBox(height: 8),
-                        TextField(
-                          decoration: const InputDecoration(
-                            border: OutlineInputBorder(),
-                            hintText: 'Edit Prompt...',
-                          ),
-                          maxLines: 3,
-                          controller: promptController,
+                          onPressed: () {
+                            Navigator.pop(context);
+                            
+                            // Generate music with AI-optimized prompt
+                            _generateMusicAndUpdateFlag(weatherData, flagId);
+                          },
+                          child: const Text('Generate Music'),
                         ),
                       ],
                     ),
-                  ),
-                ),
-                
-                // Button area
-                const SizedBox(height: 16),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    TextButton(
-                      onPressed: () {
-                        Navigator.pop(context);
-                      },
-                      child: const Text('Cancel'),
-                    ),
-                    const SizedBox(width: 8),
-                    ElevatedButton(
-                      onPressed: () {
-                        Navigator.pop(context);
-                        
-                        // Use the modified prompt
-                        _generateMusicAndUpdateFlag(weatherData, flagId, promptController.text);
-                      },
-                      child: const Text('Generate Music'),
-                    ),
                   ],
                 ),
-              ],
-            ),
-          ),
+              ),
+            );
+          }
         );
       },
     );
   }
   
+  // 修改 _generateMusicAndUpdateFlag 方法
   Future<void> _generateMusicAndUpdateFlag(WeatherData weatherData, String flagId, [String? customPrompt]) async {
+    // 显示加载对话框
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => const Center(
-        child: CircularProgressIndicator(),
+      builder: (context) => Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const CircularProgressIndicator(),
+            const SizedBox(height: 20),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Text('Generating music...'),
+            ),
+          ],
+        ),
       ),
     );
     
     try {
-      // Use the user-provided prompt or default prompt
-      final prompt = customPrompt ?? weatherData.buildMusicPrompt();
-      final musicTitle = '${weatherData.cityName} ${weatherData.weatherDescription} music';
+      String prompt;
       
-      // Use StabilityAudioService to generate a real music file
+      // 如果提供了自定义提示，则使用它，否则用DeepSeek生成
+      if (customPrompt != null && customPrompt.isNotEmpty) {
+        prompt = customPrompt;
+      } else {
+        // 使用DeepSeek生成优化的提示
+        try {
+          prompt = await _deepSeekApiService.generateMusicPrompt(
+            weatherDescription: weatherData.weatherDescription,
+            temperature: weatherData.temperature,
+            humidity: weatherData.humidity,
+            windSpeed: weatherData.windSpeed,
+            cityName: weatherData.cityName,
+            vibeName: _selectedVibe?.name,
+            genreName: _selectedGenre?.name,
+          );
+        } catch (e) {
+          print('Failed to generate prompt with DeepSeek: $e');
+          // 回退到天气服务提示
+          prompt = weatherData.buildMusicPrompt();
+          
+          // 添加音乐偏好
+          if (_selectedVibe != null || _selectedGenre != null) {
+            prompt += '\n\nMusic preferences: ';
+            if (_selectedVibe != null) {
+              prompt += '${_selectedVibe!.name} atmosphere, ';
+            }
+            if (_selectedGenre != null) {
+              prompt += '${_selectedGenre!.name} style.';
+            }
+          }
+        }
+      }
+      
+      // 构建音乐标题，包括偏好
+      String musicTitle = '${weatherData.cityName} ${weatherData.weatherDescription} music';
+      if (_selectedVibe != null || _selectedGenre != null) {
+        musicTitle += ' - ';
+        if (_selectedVibe != null) {
+          musicTitle += '${_selectedVibe!.name} ';
+        }
+        if (_selectedGenre != null) {
+          musicTitle += '${_selectedGenre!.name}';
+        }
+      }
+      
+      // 使用StabilityAudioService生成音乐
       final StabilityAudioService audioService = StabilityAudioService(
         apiKey: AppConfig.stabilityApiKey
       );
       
-      // Call the service to generate music
       final result = await audioService.generateMusic(
         prompt,
         outputFormat: "mp3",
@@ -1093,17 +1147,17 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         saveLocally: true,
       );
       
-      // Get the audio URL from the result
+      // 从结果中获取音频URL
       final audioUrl = result['audio_url'];
-      // Ensure audioUrl starts with file://
+      // 确保audioUrl以file://开头
       final String finalAudioUrl = audioUrl.startsWith('file://') 
           ? audioUrl 
           : 'file://$audioUrl';
       
-      // Create a unique music ID
+      // 创建唯一音乐ID
       final musicId = 'music_${DateTime.now().millisecondsSinceEpoch}';
       
-      // Create a MusicItem object
+      // 创建MusicItem对象
       final musicItem = MusicItem(
         id: musicId,
         title: musicTitle,
@@ -1113,12 +1167,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         createdAt: DateTime.now(),
       );
       
-      // Add to MusicLibraryManager
+      // 添加到MusicLibraryManager
       final MusicLibraryManager libraryManager = MusicLibraryManager();
       await libraryManager.addMusic(musicItem);
       
       if (mounted) {
-        // Update local state without triggering map operations
+        // 更新本地状态
         if (_flagInfoMap.containsKey(flagId)) {
           setState(() {
             final flagInfo = _flagInfoMap[flagId]!;
@@ -1130,19 +1184,39 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             );
             
             _flagInfoMap[flagId] = updatedInfo;
+            
+            // 音乐生成成功后，才添加标记到地图上
+            _mapService.addMarker(
+              id: flagId,
+              position: flagInfo.position,
+              title: '',
+              icon: Container(
+                width: 40,
+                height: 40,
+                alignment: Alignment.center,
+                child: Icon(
+                  Icons.flag,
+                  color: Colors.red,
+                  size: 15.0, 
+                ),
+              ),
+              onTap: () {
+                print('Flag clicked: $flagId');
+                _showFlagInfoWindow(flagId, flagInfo.position);
+              },
+              onLongPress: () {
+                _showDeleteMarkerDialog(flagId);
+              },
+            );
+            
+            // 保存到持久化服务
+            _mapService.saveFlagInfo(flagId, updatedInfo);
           });
-          
-          // Safely update the map service in the non-UI update part
-          try {
-            _mapService.saveFlagInfo(flagId, _flagInfoMap[flagId]!);
-          } catch (e) {
-            print('Failed to update map marker: $e');
-          }
         }
         
-        // Safely close the dialog
+        // 安全关闭对话框
         if (Navigator.canPop(context)) {
-          Navigator.of(context).pop(); // Close the loading dialog
+          Navigator.of(context).pop(); // 关闭加载对话框
         }
         
         ScaffoldMessenger.of(context).showSnackBar(
@@ -1154,7 +1228,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       print('Error generating music: $e');
       
       if (mounted && Navigator.canPop(context)) {
-        Navigator.of(context).pop(); // Close the loading dialog
+        Navigator.of(context).pop(); // 关闭加载对话框
         
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Failed to generate music: $e')),
